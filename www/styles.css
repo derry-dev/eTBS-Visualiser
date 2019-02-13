@@ -1,0 +1,81 @@
+html {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    overflow-y: hidden;
+    background-color: #222d32;
+}
+.shiny-output-error {
+  	visibility: hidden;
+}
+.shiny-output-error:before {
+  	visibility: hidden;
+}
+
+/* Theme colouring */
+.skin-blue .main-header .logo {
+    background-color: #D51067;
+    height: 0;
+}
+
+.skin-blue .main-header .logo:hover {
+    background-color: #802245;
+}
+
+.skin-blue .main-header .navbar {
+    background-color: #D51067;
+}
+
+.skin-blue .main-header .navbar .sidebar-toggle:hover {
+    background-color: #802245;
+}
+
+/* Sidebar and dropdown adjustments */
+.form-group .bootstrap-select, .form-horizontal .bootstrap-select, .form-inline .bootstrap-select {
+  background: none;
+}
+
+.form-group {
+  margin-bottom: 0;
+}
+
+.bootstrap-select .dropdown-menu li a {
+  color: #000;
+}
+
+/* Fix z-index of header, sidebar and content */
+.content-wrapper {
+  position: relative;
+  z-index: 0;
+}
+
+.main-header {
+  position: relative;
+  z-index: 1;
+}
+
+.sidebar {
+  position: relative;
+  z-index: 2;
+}
+
+/* Workaround for overlap of sidebar menu with header */
+#sidebarCollapsed {
+    background: none;
+}
+
+/* Auto resize leaflet map height */
+#plt_map {
+  height: calc(100vh - 50px) !important;
+}
+
+/* Adjustments when width > 768px (i.e. desktop mode) */
+@media only screen and (min-width: 768px) {
+  .skin-blue .main-header .logo {
+    height: 50px;
+  }
+}
+
