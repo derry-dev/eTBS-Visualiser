@@ -1,5 +1,4 @@
 html {
-    -webkit-touch-callout: none;
     -webkit-user-select: none;
     -khtml-user-select: none;
     -moz-user-select: none;
@@ -35,31 +34,31 @@ html {
 
 /* Sidebar and dropdown adjustments */
 .form-group .bootstrap-select, .form-horizontal .bootstrap-select, .form-inline .bootstrap-select {
-  background: none;
+    background: none;
 }
 
 .form-group {
-  margin-bottom: 0;
+    margin-bottom: 0;
 }
 
 .bootstrap-select .dropdown-menu li a {
-  color: #000;
+    color: #000;
 }
 
 /* Fix z-index of header, sidebar and content */
 .content-wrapper {
-  position: relative;
-  z-index: 0;
+    position: relative;
+    z-index: 0;
 }
 
 .main-header {
-  position: relative;
-  z-index: 1;
+    position: relative;
+    z-index: 1;
 }
 
 .sidebar {
-  position: relative;
-  z-index: 2;
+    position: relative;
+    z-index: 2;
 }
 
 /* Workaround for overlap of sidebar menu with header */
@@ -69,13 +68,20 @@ html {
 
 /* Auto resize leaflet map height */
 #plt_map {
-  height: calc(100vh - 50px) !important;
+   height: calc(100vh - 50px) !important;
+}
+
+/* Import dialog warnings box */
+#db_warning {
+    border: none;
+    padding: 0;
+    height: 0;
 }
 
 /* Adjustments when width > 768px (i.e. desktop mode) */
 @media only screen and (min-width: 768px) {
   .skin-blue .main-header .logo {
-    height: 50px;
+      height: 50px;
   }
 }
 

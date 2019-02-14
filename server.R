@@ -1,10 +1,55 @@
-server <- function(input, output, session) {
+dialog_import <- function(stage) {
+  if (stage == "Connect") {
+    md <- modalDialog(
+      title = div(style = "text-align: center;", "Connect to Database"),
+      div(style = "margin-top: -10px;", textInput("db_driver", "Driver Name", "SQL Server Native Client 11.0")),
+      div(style = "padding-top: 5px;", textInput("db_server", "Server Name", "DESKTOP-F25RUHL")),
+      div(style = "padding-top: 5px;", textInput("db_database", "Database Name", "UTMA_Validation")),
+      div(style = "position: relative;", htmlOutput("db_warning")),
+      footer = div(
+        style = "text-align: center;",
+        tagList(
+          actionButton("db_connect", "Connect"),
+          modalButton("Cancel")
+        )
+      ),
+      size = c("s")
+    )
+  }
+  return(showModal(md))
+}
 
+server <- function(input, output, session) {
+  
+  observeEvent(input$import, {
+    dialog_import("Connect")
+  })
+  
+  modal_state <- reactiveVal(0)
+  
+  observeEvent(input$db_connect, {
+    con <- get_db_connection(input$db_driver, input$db_server, input$db_database)
+    if (con == -1) {
+      output$db_warning <- renderText("<div style='color:red; text-align:center;'>ODBC connection failed</div>")
+    } else {
+      import_all(con)
+      removeModal()
+    }
+  })
+  
+  observeEvent({
+    input$db_driver
+    input$db_server
+    input$db_database
+  },{
+    output$db_warning <- renderText("")
+  })
+  
   output$plt_callsign_ui <- renderUI({
     plt_callsign_choices <- dat$tracks %>% subset(Track_Date %in% input$plt_date & Path_Leg %in% input$plt_leg) %>% .$Callsign %>% unique() %>% as.vector()
     pickerInput("plt_callsign", "Callsign", choices = plt_callsign_choices, multiple = T, options = pickerOptions(actionsBox = T))
   })
-
+  
   output$plt_map <- renderLeaflet({
     leaflet(options = leafletOptions(zoomControl = F)) %>% 
       setView(lng = -0.45, lat = 51.46, zoom = 10) %>%

@@ -6,7 +6,7 @@
 
 In order to use the eTBS visualiser on your local PC, you must first [install R](https://cloud.r-project.org/).
 
-Once R is installed, open the R console, install the required R packages (listed in section 2) and run the commands:
+Once R is installed, open the R console and run the following commands after installing the required R packages (see next section) :
 
 ```r
 # Replace the file path with the directory containing the eTBS Visualiser folder
@@ -19,42 +19,25 @@ Alternatively, you can [install RStudio](https://www.rstudio.com/products/rstudi
 
 ### 1.2. Editing the Visualiser
 
-RStudio is recommended for development of the visualiser. It is not recommended to move any files within the **eTBS Visualiser** folder as this will likely break functionality.
-
-Currently (correct as of 13/02/2019), the front-end of the visualiser is not directly linked to the eTBS database. The relevant data is queried from the database via the file **import.R**, which saves these locally to the **_~/data/_** folder as CSV files. The visualiser only uses these CSV files.
+RStudio is recommended for development of the visualiser. It is not recommended to move any files within the **eTBS Visualiser** folder as this will break functionality.
 
 ---
 
 ## 2. R Package Requirements
 
-The following packages must be installed via the R console in order for the visualiser to function correctly:
-
-* shiny
-* shinydashboard
-* shinyWidgets
-* leaflet
-* RColorBrewer
-* data.table
-* here
-* magrittr
-
-In order to import new data from the eTBS database, these following packages are also required:
-
-* RODBC
-
-These packages can be installed via the R commands:
+Run the command below within the R console to install the required R packages for the visualiser to function correctly:
 
 ```r
-# Install a single package
-install.packages("shiny")
-
-# Install multiple packages at once
 install.packages(c("shiny", "shinydashboard", "shinyWidgets", "leaflet", "RColorBrewer", "data.table", "here", "magrittr", "RODBC"))
 ```
 
 ---
 
 ## 3. Version Notes
+
+14/02/2019
+
+* Incorporated database import script into dashboard
 
 13/02/2019
 

@@ -15,33 +15,27 @@ menu.PLT <- menuItem(
   tabName = "plt",
   icon = icon("location-arrow")
 )
-
-tab.PLT <- tabItem(
-  tabName = "plt",
-  div(style = "margin: -15px;", leafletOutput("plt_map", height="100%"))
-)
-
-
-
 menu.ORD_Val <- menuItem(
   "ORD Validation",
   tabName = "ordval",
   icon = icon("plane-arrival")
 )
-
-tab.ORD_Val <- tabItem(
-  tabName = "ordval",
-  "Things here"
-)
-
-
-
 menu.ORD_Cal <- menuItem(
   "ORD Calibration",
   tabName = "ordcal",
   icon = icon("cog")
 )
 
+
+
+tab.PLT <- tabItem(
+  tabName = "plt",
+  div(style = "margin: -15px;", leafletOutput("plt_map", height="100%"))
+)
+tab.ORD_Val <- tabItem(
+  tabName = "ordval",
+  "Things here"
+)
 tab.ORD_Cal <- tabItem(
   tabName = "ordcal",
   "Content here"
@@ -61,6 +55,12 @@ header <- dashboardHeader(
 sidebar <- dashboardSidebar(
   sidebarMenu(
     id = "sidebarmenu",
+    div(
+      style = "height: 50px; width: 230px; overflow-x: hidden;",
+      div(style = "position: relative; display: inline-block; top: 15px; left: 18px;", icon("database")),
+      div(style = "position: relative; display: inline-block; top: 15px; left: 25px;", "Import Data"),
+      div(style = "float: right;", actionButton("import", icon("download")))
+    ),
     menu.PLT,
     conditionalPanel(
       "input.sidebarmenu === 'plt'",
