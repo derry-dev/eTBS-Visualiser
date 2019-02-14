@@ -1,12 +1,18 @@
 # eTBS Visualiser
 
-## 1. User Guide
+## User Guide
 
-### 1.1. Running the Visualiser
+### Running the Visualiser
 
 In order to use the eTBS visualiser on your local PC, you must first [install R](https://cloud.r-project.org/).
 
-Once R is installed, open the R console and run the following commands after installing the required R packages (see next section) :
+Once R is installed, open the R console and run the command below to install the required R packages for the visualiser to function correctly:
+
+```r
+install.packages(c("shiny", "shinydashboard", "shinyWidgets", "leaflet", "RColorBrewer", "data.table", "here", "magrittr", "RODBC"))
+```
+
+After the packages are installed, run the following commands to launch the visualiser:
 
 ```r
 # Replace the file path with the directory containing the eTBS Visualiser folder
@@ -17,23 +23,13 @@ shiny::runApp("eTBS Visualiser", launch.browser = TRUE)
 
 Alternatively, you can [install RStudio](https://www.rstudio.com/products/rstudio/download/#download), open any of the files **global.R**, **ui.R** or **server.R** in RStudio, install the required R packages and click the run icon on the top right-hand side of the source window.
 
-### 1.2. Editing the Visualiser
+### Editing the Visualiser
 
 RStudio is recommended for development of the visualiser. It is not recommended to move any files within the **eTBS Visualiser** folder as this will break functionality.
 
 ---
 
-## 2. R Package Requirements
-
-Run the command below within the R console to install the required R packages for the visualiser to function correctly:
-
-```r
-install.packages(c("shiny", "shinydashboard", "shinyWidgets", "leaflet", "RColorBrewer", "data.table", "here", "magrittr", "RODBC"))
-```
-
----
-
-## 3. Version Notes
+## Version Notes
 
 14/02/2019
 
