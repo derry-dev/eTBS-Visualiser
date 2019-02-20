@@ -58,7 +58,7 @@ sidebar <- dashboardSidebar(
     div(
       style = "height: 50px; width: 230px; overflow-x: hidden;",
       div(style = "position: relative; display: inline-block; top: 15px; left: 18px;", icon("database")),
-      div(style = "position: relative; display: inline-block; top: 15px; left: 25px;", "Import Data"),
+      div(style = "position: relative; display: inline-block; top: 15px; left: 25px;", "Refresh Data"),
       div(style = "float: right;", actionButton("import", icon("download")))
     ),
     menu.PLT,

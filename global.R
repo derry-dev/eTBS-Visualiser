@@ -5,6 +5,7 @@ library(shiny)
 library(shinydashboard)
 library(shinyWidgets)
 library(leaflet)
+library(sp)
 library(RColorBrewer)
 
 '%!in%' <- function(x,y){!('%in%'(x,y))}
@@ -32,6 +33,9 @@ get_db_connection <- function(driver, server, database) {
 import_all <- function(db_connection) {
   # Import from database ----------------------------------------------------
   con <- db_connection
+  
+  # For troubleshooting purposes
+  # con <- odbcDriverConnect(connection="Driver={SQL Server Native Client 11.0};server=DESKTOP-F25RUHL;database=UTMA_Validation;trusted_connection=yes;")
   
   dat <- list()
   
@@ -70,8 +74,6 @@ import_all <- function(db_connection) {
     Volume_Type,
     Runway_Name,
     Point_Sequence,
-    Point_X,
-    Point_Y,
     Latitude,
     Longitude,
     Min_Altitude,
@@ -116,8 +118,6 @@ import_all <- function(db_connection) {
     FROM tbl_Radar_Track_Point_Derived
   ) AS t2 ON t1.Radar_Track_Point_ID = t2.Radar_Track_Point_ID
   " %>% sqlQuery(con,.) %>% as.data.table()
-  
-  odbcClose(con)
   
   # Get time of day column from seconds after midnight
   dat$tracks$Track_Time_New <- format(as.POSIXct('1900-1-1')+dat$tracks$Track_Time, "%H:%M:%S")

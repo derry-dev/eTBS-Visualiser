@@ -64,7 +64,11 @@ server <- function(input, output, session) {
   })
   
   d <- reactive({
-    subset(dat$tracks, Track_Date %in% input$plt_date & Callsign %in% input$plt_callsign)
+    subset(dat$tracks, Track_Date %in% input$plt_date & Callsign %in% input$plt_callsign)[,':='(Lat=Lat*180/pi, Lon=Lon*180/pi)]
+  })
+  
+  v <- reactive({
+    subset(dat$volumes, Volume_Name %in% input$plt_vol)[,':='(Latitude=Latitude*180/pi, Longitude=Longitude*180/pi)]
   })
   
   lab <- reactive({
@@ -89,14 +93,33 @@ server <- function(input, output, session) {
   
   observe({
     p <- leafletProxy("plt_map", data=d()) %>% clearGroup("Tracks")
-    pal1 <- colorFactor(brewer.pal(11, "Spectral"), domain=dat$tracks$Path_Leg)
+    pal <- colorFactor(brewer.pal(11, "Spectral"), domain=dat$volumes$Path_Leg)
     p %>% addCircleMarkers(
-      lng = ~as.numeric(Lon)*180/pi,
-      lat = ~as.numeric(Lat)*180/pi,
-      color = ~pal1(Path_Leg),
+      lng = ~Lon,
+      lat = ~Lat,
+      color = ~pal(Path_Leg),
       label=lab(), labelOptions=labelOptions(textsize="13px", direction="auto"),
       weight=5, radius=5, stroke=T, opacity=0.85, fillOpacity=0.85, group="Tracks"
     )
+  })
+  
+  observe({
+    p <- leafletProxy("plt_map") %>% clearGroup("Volumes")
+    pal <- colorFactor(brewer.pal(11, "Spectral"), domain=dat$volumes$Path_Leg)
+    for (i in unique(v()$Volume_Name)) {
+      p %>% addPolygons(
+        data = Polygon(subset(v(), Volume_Name %in% i, select=c(Longitude,Latitude))),
+        weight = 5,
+        opacity = 0.5,
+        fillOpacity = 0.1,
+        color = "Red",
+        dashArray = "18",
+        label = i,
+        labelOptions = labelOptions(style = list("font-weight" = "bold"),opacity = 1, textsize="12px", direction = "auto"),
+        highlight = highlightOptions(weight = 5, color = "#666", dashArray = "", fillOpacity = 0.5, bringToFront = F),
+        group = "Volumes"
+      )
+    }
   })
   
 }
