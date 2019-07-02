@@ -1,57 +1,221 @@
-dialog_import <- function(stage) {
-  if (stage == "Connect") {
-    md <- modalDialog(
-      title = div(style = "text-align: center;", "Connect to Database"),
-      div(style = "margin-top: -10px;", textInput("db_driver", "Driver Name", "SQL Server Native Client 11.0")),
-      div(style = "padding-top: 5px;", textInput("db_server", "Server Name", "DESKTOP-F25RUHL")),
-      div(style = "padding-top: 5px;", textInput("db_database", "Database Name", "UTMA_Validation")),
-      div(style = "position: relative;", htmlOutput("db_warning")),
-      footer = div(
-        style = "text-align: center;",
-        tagList(
-          actionButton("db_connect", "Connect"),
-          modalButton("Cancel")
-        )
-      ),
-      size = c("s")
-    )
-  }
-  return(showModal(md))
-}
-
 server <- function(input, output, session) {
+
+  # ----------------------------------------------------------------------- #
+  # Database Connection -----------------------------------------------------
+  # ----------------------------------------------------------------------- #
   
-  observeEvent(input$import, {
-    dialog_import("Connect")
+  con <- eventReactive(input$db_connect, {
+    valueExpr = get_db_connection(input$db_driver, input$db_server, input$db_database, input$db_username, input$db_password)
   })
   
-  modal_state <- reactiveVal(0)
+  observeEvent(con(), {
+    output$db_status <- renderUI({
+      if (con() != -1L) {
+        div(style="margin: 7px 0 0 6px;", "Connected", icon("check-circle"))
+      } else {
+        div(style="margin: 7px 0 0 6px;", "Error", icon("times-circle"))
+      }
+    })
+  })
   
-  observeEvent(input$db_connect, {
-    con <- get_db_connection(input$db_driver, input$db_server, input$db_database)
-    if (con == -1) {
-      output$db_warning <- renderText("<div style='color:red; text-align:center;'>ODBC connection failed</div>")
-    } else {
-      import_all(con)
-      removeModal()
+  # ----------------------------------------------------------------------- #
+  # Query Tool --------------------------------------------------------------
+  # ----------------------------------------------------------------------- #
+  
+  query <- eventReactive(input$db_execute, {
+    if (con() != -1L) input$db_query %>% sqlQuery(con(),.) %>% as.data.table()
+  })
+  
+  output$db_output <- DT::renderDataTable({
+    datatable(
+      query(),
+      rownames = F,
+      options = list(
+        pageLength = 15,
+        lengthMenu = seq(5, 100, 5),
+        columnDefs = list(list(className = 'dt-center', targets = "_all")),
+        scrollX = T
+      )
+    )
+  })
+  
+  observeEvent(input$db_clear, {
+    updateTextAreaInput(session, "db_query", value="")
+  })
+  
+  # ----------------------------------------------------------------------- #
+  # Database List -----------------------------------------------------------
+  # ----------------------------------------------------------------------- #
+  
+  db_list <- eventReactive(con(), {
+    if (con() != -1L) query_table_list %>% sqlQuery(con(),.) %>% as.data.table()
+  })
+  
+  output$db_databases <- DT::renderDataTable({
+    datatable(
+      db_list(),
+      rownames = F,
+      options = list(
+        pageLength = 15,
+        lengthMenu = seq(5, 100, 5),
+        columnDefs = list(list(className = 'dt-center', targets = "_all")),
+        scrollX = T
+      )
+    )
+  })
+  
+  # ----------------------------------------------------------------------- #
+  # Flight Plan -------------------------------------------------------------
+  # ----------------------------------------------------------------------- #
+  
+  flightplan <- eventReactive(con(), {
+    if (con() != -1L) query_flightplan %>% sqlQuery(con(),.) %>% as.data.table()
+  })
+  
+  output$db_flightplans <- DT::renderDataTable({
+    datatable(
+      flightplan(),
+      rownames = F,
+      options = list(
+        pageLength = 15,
+        lengthMenu = seq(5, 100, 5),
+        columnDefs = list(list(className = 'dt-center', targets = "_all")),
+        scrollX = T
+      )
+    )
+  })
+  
+  observeEvent(flightplan(), {
+    updatePickerInput(
+      session,
+      "pltmap_fpdate",
+      choices = flightplan()$FP_Date %>% as.character() %>% unique() %>% .[order(as.Date(., format="%d/%m/%Y"))]
+    )
+  })
+  
+  observeEvent(input$pltmap_fpdate, {
+    pltmap_fpid_choices <- flightplan()[FP_Date %in% input$pltmap_fpdate]$Flight_Plan_ID %>% as.character() %>% unique() %>% sort()
+    updatePickerInput(
+      session,
+      "pltmap_fpid",
+      choices = pltmap_fpid_choices,
+      choicesOpt = list(subtext = flightplan()[Flight_Plan_ID %in% pltmap_fpid_choices]$Callsign %>% as.character())
+    )
+  })
+  
+  # ----------------------------------------------------------------------- #
+  # Volumes -----------------------------------------------------------------
+  # ----------------------------------------------------------------------- #
+  
+  volumes <- eventReactive(con(), {
+    if (con() != -1L) {
+      query_volumes %>% sqlQuery(con(),.) %>% as.data.table() %>%
+        ifelse(c("Longitude", "Latitude") %in% names(.) %>% all(), .[,':='(Latitude=Latitude*180/pi, Longitude=Longitude*180/pi)], .)
     }
   })
   
-  observeEvent({
-    input$db_driver
-    input$db_server
-    input$db_database
-  },{
-    output$db_warning <- renderText("")
+  output$db_volumes <- DT::renderDataTable({
+    datatable(
+      volumes(),
+      rownames = F,
+      options = list(
+        pageLength = 15,
+        lengthMenu = seq(5, 100, 5),
+        columnDefs = list(list(className = 'dt-center', targets = "_all")),
+        scrollX = T
+      )
+    )
   })
   
-  output$plt_callsign_ui <- renderUI({
-    plt_callsign_choices <- dat$tracks %>% subset(Track_Date %in% input$plt_date & Path_Leg %in% input$plt_leg) %>% .$Callsign %>% unique() %>% as.vector()
-    pickerInput("plt_callsign", "Callsign", choices = plt_callsign_choices, multiple = T, options = pickerOptions(actionsBox = T))
+  observeEvent(volumes(), {
+    updatePickerInput(
+      session,
+      "pltmap_volumes",
+      choices = volumes()$Volume_Name %>% as.character() %>% unique()
+    )
   })
   
-  output$plt_map <- renderLeaflet({
-    leaflet(options = leafletOptions(zoomControl = F)) %>% 
+  # ----------------------------------------------------------------------- #
+  # Legs --------------------------------------------------------------------
+  # ----------------------------------------------------------------------- #
+  
+  legs <- eventReactive(con(), {
+    if (con() != -1L) query_legs %>% sqlQuery(con(),.) %>% as.data.table()
+  })
+  
+  output$db_legs <- DT::renderDataTable({
+    datatable(
+      legs(),
+      rownames = F,
+      options = list(
+        pageLength = 15,
+        lengthMenu = seq(5, 100, 5),
+        columnDefs = list(list(className = 'dt-center', targets = "_all")),
+        scrollX = T
+      )
+    )
+  })
+  
+  # observeEvent(legs(), {
+  #   pltmap_legs_choices <- legs()$Path_Leg_Name %>% as.character()
+  #   updatePickerInput(
+  #     session,
+  #     "pltmap_legs",
+  #     choices = pltmap_legs_choices,
+  #     selected = pltmap_legs_choices,
+  #     choicesOpt = list(subtext = legs()$Path_Leg_Type %>% as.character())
+  #   )
+  # })
+  
+  # ----------------------------------------------------------------------- #
+  # Tracks ------------------------------------------------------------------
+  # ----------------------------------------------------------------------- #
+  
+  tracks <- eventReactive(input$pltmap_update, {
+    if (con() != -1L) {
+      sprintf(
+        "%s WHERE Flight_Plan_ID IN (%s)",
+        query_tracks, paste(input$pltmap_fpid, collapse = ",")
+      ) %>%
+        sqlQuery(con(),.) %>%
+        as.data.table()
+    }
+  })
+  
+  
+  observeEvent(tracks(), {
+    output$plt_tracks_button <- renderUI({
+      dropdown(
+        DT::dataTableOutput("plt_tracks"),
+        style = "simple",
+        icon = icon("table"),
+        width = "600px",
+        tooltip = tooltipOptions(title = "View Track Table", placement = "bottom")
+      )
+    })
+  })
+  
+  output$plt_tracks <- DT::renderDataTable({
+    datatable(
+      tracks(),
+      rownames = F,
+      options = list(
+        pageLength = 15,
+        lengthMenu = seq(5, 15, 5),
+        columnDefs = list(list(className = 'dt-center', targets = "_all")),
+        scrollX = T
+      )
+    )
+  })
+  
+  # ----------------------------------------------------------------------- #
+  # PLT Map -----------------------------------------------------------------
+  # ----------------------------------------------------------------------- #
+  
+  map_position <- reactiveValues(default = 0, current = 0)
+  
+  output$pltmap <- renderLeaflet({
+    map_position$default <- leaflet(options = leafletOptions(zoomControl = F, preferCanvas = T)) %>% 
       setView(lng = -0.45, lat = 51.46, zoom = 10) %>%
       addProviderTiles(providers$Esri.WorldImagery, options=providerTileOptions(noWrap=TRUE), group="Satellite") %>%
       addProviderTiles(providers$CartoDB.Positron, options=providerTileOptions(noWrap=TRUE), group="Grey") %>%
@@ -63,52 +227,71 @@ server <- function(input, output, session) {
       addLayersControl(baseGroups=c("Satellite","Grey","Dark","Light","Topo","OSM","OSM B&W"), options=layersControlOptions(collapsed=T))
   })
   
-  d <- reactive({
-    subset(dat$tracks, Track_Date %in% input$plt_date & Callsign %in% input$plt_callsign)[,':='(Lat=Lat*180/pi, Lon=Lon*180/pi)]
+  observeEvent({
+    input$pltmap_zoom
+    input$pltmap_center
+  },{
+    map_position$current <- map_position$default %>%
+      setView(lng = input$pltmap_center$lng,
+              lat = input$pltmap_center$lat,
+              zoom = input$pltmap_zoom)
   })
   
-  v <- reactive({
-    subset(dat$volumes, Volume_Name %in% input$plt_vol)[,':='(Latitude=Latitude*180/pi, Longitude=Longitude*180/pi)]
-  })
+  output$pltmap_screenshot <- downloadHandler(
+    filename = function() {
+      timestamp <- Sys.time() %>% as.character() %>% gsub("-|:", "", .) %>% gsub(" ", "_", .)
+      name <- paste0("PLT_Map_", timestamp,".png")
+      return(name)
+    },
+    content = function(file) {
+      mapshot(map_position$current, file = file, vwidth = input$pltDim[1], vheight = input$pltDim[2])
+    }
+  )
   
-  lab <- reactive({
-    if (dim(d())[1] != 0 & dim(d())[2] != 0) {
+  # ----------------------------------------------------------------------- #
+  # PLT Map Plotting --------------------------------------------------------
+  # ----------------------------------------------------------------------- #
+  
+  pltmap_lab <- reactive({
+    if (dim(tracks())[1] != 0 & dim(tracks())[2] != 0) {
       sprintf("
               <b>Callsign</b>: %s <font size='1'><b>FP ID</b> %s</font><br/>
               <b>Time</b>: %s %s <font size='1'><b>Point ID</b> %s</font><br/>
+              <b>Mode C</b>: %s <b>Corrected</b>: %s<br/>
               <b>Path Leg</b>: %s<br/>
               <b>Range to ILS</b>: %s<br/>
               <b>Range to Threshold</b>: %s<br/>
               ",
-              d()$Callsign, d()$Flight_Plan_ID,
-              d()$Track_Date, d()$Track_Time_New, d()$Radar_Track_Point_ID,
-              d()$Path_Leg,
-              d()$Range_To_ILS,
-              d()$Range_To_Threshold
+              tracks()$Callsign, tracks()$Flight_Plan_ID,
+              tracks()$Track_Date, tracks()$Track_Time, tracks()$Radar_Track_Point_ID,
+              tracks()$Mode_C, tracks()$Corrected_Mode_C,
+              tracks()$Path_Leg,
+              tracks()$Range_To_ILS,
+              tracks()$Range_To_Threshold
       ) %>% lapply(htmltools::HTML)
     } else {
       NULL
     }
   })
   
-  observe({
-    p <- leafletProxy("plt_map", data=d()) %>% clearGroup("Tracks")
-    pal <- colorFactor(brewer.pal(11, "Spectral"), domain=dat$volumes$Path_Leg)
+  observeEvent(tracks(), {
+    p <- leafletProxy("pltmap", data=tracks()) %>% clearGroup("Tracks")
+    pal <- colorFactor(brewer.pal(11, "Spectral"), domain=legs()$Path_Leg_Name)
     p %>% addCircleMarkers(
-      lng = ~Lon,
-      lat = ~Lat,
+      lng = ~Lon*180/pi,
+      lat = ~Lat*180/pi,
       color = ~pal(Path_Leg),
-      label=lab(), labelOptions=labelOptions(textsize="13px", direction="auto"),
+      label=pltmap_lab(), labelOptions=labelOptions(textsize="13px", direction="auto"),
       weight=5, radius=5, stroke=T, opacity=0.85, fillOpacity=0.85, group="Tracks"
     )
   })
   
   observe({
-    p <- leafletProxy("plt_map") %>% clearGroup("Volumes")
-    pal <- colorFactor(brewer.pal(11, "Spectral"), domain=dat$volumes$Path_Leg)
-    for (i in unique(v()$Volume_Name)) {
+    p <- leafletProxy("pltmap") %>% clearGroup("Volumes")
+    pal <- colorFactor(brewer.pal(11, "Spectral"), domain=volumes()$Volume_Name)
+    for (i in volumes()$Volume_Name %>% unique()) {
       p %>% addPolygons(
-        data = Polygon(subset(v(), Volume_Name %in% i, select=c(Longitude,Latitude))),
+        data = Polygon(volumes()[Volume_Name %in% i, c("Longitude","Latitude")]),
         weight = 5,
         opacity = 0.5,
         fillOpacity = 0.1,

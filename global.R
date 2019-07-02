@@ -1,135 +1,120 @@
-library(RODBC)
-library(here)
-library(data.table)
+rm(list = ls())
+
+# install.packages(
+#   c(
+#     "shiny", "shinydashboard", "shinyWidgets", "RODBC", "data.table",
+#     "DT", "leaflet", "sp", "RColorBrewer", "mapview", "magrittr", "plotly"
+#   ),
+#   repos = "https://cloud.r-project.org",
+#   dependencies = T
+# )
+# webshot::install_phantomjs()
+
 library(shiny)
 library(shinydashboard)
 library(shinyWidgets)
+library(RODBC)
+library(data.table)
+library(DT)
 library(leaflet)
 library(sp)
 library(RColorBrewer)
+library(mapview)
+library(magrittr)
+library(plotly)
+
+# ----------------------------------------------------------------------- #
+# Functions ---------------------------------------------------------------
+# ----------------------------------------------------------------------- #
 
 '%!in%' <- function(x,y){!('%in%'(x,y))}
 
-data_path <- paste0(here(), "/data/")
-data_files <- list.files(data_path, pattern = "*.csv")
-dat <- list()
-for (x in data_files) {
-  dat[[gsub(".csv", "", x)]] <- fread(paste0(data_path,x), encoding = "UTF-8")
-}
-names(dat) <- gsub(".csv", "", data_files)
-
-title <- "eTBS Visualiser"
-plt_date_choices <- dat$tracks$Track_Date %>% unique() %>% as.vector()
-plt_rwy_choices <- dat$flightplan$Landing_Runway %>% unique() %>% as.vector()
-plt_leg_choices <- c(dat$legs$Path_Leg_Name, "NA") %>% unique() %>% as.vector()
-plt_vol_choices <- dat$volumes$Volume_Name %>% unique() %>% as.vector()
-
-get_db_connection <- function(driver, server, database) {
-  connection_string <- paste0("Driver={",driver,"};server=",server,";database=",database,";trusted_connection=yes;")
-  con <- odbcDriverConnect(connection=connection_string)
-  return(con)
+get_db_connection <- function(str_driver, str_server, str_database, str_uid, str_pwd) {
+  connection_string <- sprintf(
+    "Driver={%s};Server={%s};Database={%s};Uid={%s};Pwd={%s};",
+    str_driver, str_server, str_database, str_uid, str_pwd
+  )
+  return(odbcDriverConnect(connection=connection_string))
 }
 
-import_all <- function(db_connection) {
-  # Import from database ----------------------------------------------------
-  con <- db_connection
-  
-  # For troubleshooting purposes
-  # con <- odbcDriverConnect(connection="Driver={SQL Server Native Client 11.0};server=DESKTOP-F25RUHL;database=UTMA_Validation;trusted_connection=yes;")
-  
-  dat <- list()
-  
-  dat$flightplan <- "
-  SELECT
-    t1.Flight_Plan_ID,
-    FP_Date,
-    FP_Time,
-    Callsign,
-    SSR_Code,
-    Aircraft_Type,
-    Wake_Vortex,
-    Origin,
-    Destination,
-    SID,
-    Landing_Runway,
-    Departure_Runway,
-    Departure_Roll_Time,
-    Departure_Liftoff_Time,
-    DROT,
-    Time_At_4DME,
-    Time_At_1DME
-  FROM tbl_Flight_Plan AS t1
+# ----------------------------------------------------------------------- #
+# SQL Queries -------------------------------------------------------------
+# ----------------------------------------------------------------------- #
+
+# Get list of all databases, schemas and tables
+query_table_list <- "
+  SET NOCOUNT ON
+  DECLARE @AllTables table (\"Database\" nvarchar(4000), \"Schema\" nvarchar(4000), \"Table\" nvarchar(4000))
+  INSERT INTO @AllTables (\"Database\", \"Schema\", \"Table\")
+  EXEC sp_msforeachdb 'select \"?\", s.name, t.name from [?].sys.tables t inner join sys.schemas s on t.schema_id=s.schema_id'
+  SET NOCOUNT OFF
+  SELECT * FROM @AllTables ORDER BY 1
+"
+
+# vw_ORD_Validation_View: This view generates the ORD Validation View output defined in UTMA_Validation_Tool_Requirements document
+query_vw_ORD_Validation_View <- "
+  SET DATEFORMAT dmy
+  SELECT * FROM vw_ORD_Validation_View
+  ORDER BY CAST(FP_Date AS datetime), Prediction_Time
+"
+
+# vw_ORD_Calibration_View:  This view generates the ORD Calibration View output defined in UTMA_Validation_Tool_Requirements document
+query_vw_ORD_Calibration_View <- "
+  SET DATEFORMAT dmy
+  SELECT * FROM vw_ORD_Calibration_View
+  ORDER BY CAST(FP_Date AS datetime), Track_Time
+"
+
+# eTBS Performance Model Data Output view
+query_vw_eTBS_Performance_Model <- "
+  SET DATEFORMAT dmy
+  SELECT * FROM vw_eTBS_Performance_Model
+  ORDER BY CAST(FP_Date AS datetime), Leader_4DME_Time
+"
+
+# All Pair Reference Data
+query_vw_All_Pair_Reference_Data <- "
+  SET DATEFORMAT dmy
+  SELECT * FROM vw_All_Pair_Reference_Data
+  ORDER BY CAST(FP_Date AS datetime), Leader_4DME_Time
+"
+query_vw_All_Pair_Radar_Track_Point <- "
+  SELECT * FROM vw_All_Pair_Radar_Track_Point
+"
+
+# Flight Plan
+query_flightplan <- "
+  SELECT * FROM tbl_Flight_Plan
   LEFT JOIN (
-    SELECT
-      Flight_Plan_ID,
-      Time_At_4DME,
-      Time_At_1DME
-    FROM tbl_Flight_Plan_Derived
-  ) AS t2 ON t1.Flight_Plan_ID = t2.Flight_Plan_ID
-  " %>% sqlQuery(con,.) %>% as.data.table()
-  
-  dat$volumes <- "
-  SELECT
-    t1.Volume_Name,
-    Volume_Type,
-    Runway_Name,
-    Point_Sequence,
-    Latitude,
-    Longitude,
-    Min_Altitude,
-    Max_Altitude
-  FROM tbl_Polygon AS t1
+    SELECT Flight_Plan_ID AS Flight_Plan_ID_2, Time_At_4DME, Time_At_1DME FROM tbl_Flight_Plan_Derived
+  ) AS t ON Flight_Plan_ID = Flight_Plan_ID_2
+"
+
+# Tracks
+query_tracks <- "
+  SELECT * FROM tbl_Radar_Track_Point
   LEFT JOIN (
-    SELECT
-      Volume_Name,
-      Runway_Name,
-      Volume_Type,
-      Min_Altitude,
-      Max_Altitude
-    FROM tbl_Volume
-  ) AS t2 ON t1.Volume_Name = t2.Volume_Name
-  " %>% sqlQuery(con,.) %>% as.data.table()
-  
-  dat$legs <- "SELECT * FROM tbl_Path_Leg" %>% sqlQuery(con,.) %>% as.data.table()
-  
-  dat$tracks <- "
-  SELECT
-    t1.Radar_Track_Point_ID,
-    Flight_Plan_ID,
-    Track_Date,
-    Track_Time,
-    Callsign,
-    SSR_Code,
-    Lat,
-    Lon,
-    Mode_C,
-    Corrected_Mode_C,
-    Range_To_Threshold,
-    Range_To_ILS,
-    Path_Leg
-  FROM tbl_Radar_Track_Point AS t1
-  LEFT JOIN (
-    SELECT
-      Radar_Track_Point_ID,
-      Corrected_Mode_C,
-      Range_To_Threshold,
-      Range_To_ILS,
-      Path_Leg
+    SELECT Radar_Track_Point_ID AS Radar_Track_Point_ID_2, Corrected_Mode_C, Range_To_Threshold, Range_To_ILS, Path_Leg
     FROM tbl_Radar_Track_Point_Derived
-  ) AS t2 ON t1.Radar_Track_Point_ID = t2.Radar_Track_Point_ID
-  " %>% sqlQuery(con,.) %>% as.data.table()
-  
-  # Get time of day column from seconds after midnight
-  dat$tracks$Track_Time_New <- format(as.POSIXct('1900-1-1')+dat$tracks$Track_Time, "%H:%M:%S")
-  
-  # Export to CSV -----------------------------------------------------------
-  setwd(paste(dirname(rstudioapi::getSourceEditorContext()$path)))
-  
-  for (x in names(dat)) {
-    con <- file(paste0(getwd(),"/data/",x,".csv"), encoding="UTF-8")
-    write.csv(dat[[x]], file=con, row.names=F)
-  }
-  
-  closeAllConnections()
-  
-}
+  ) AS t ON Radar_Track_Point_ID = Radar_Track_Point_ID_2
+"
+
+# Volumes
+query_volumes <- "
+  SELECT * FROM tbl_Polygon
+  LEFT JOIN (
+    SELECT Volume_Name AS Volume_Name_2, Min_Altitude, Max_Altitude FROM tbl_Volume
+  ) AS t ON Volume_Name = Volume_Name_2
+"
+
+# Legs
+query_legs <- "
+  SELECT * FROM tbl_Path_Leg
+"
+
+# ----------------------------------------------------------------------- #
+# DEBUG -------------------------------------------------------------------
+# ----------------------------------------------------------------------- #
+
+# con_debug <- odbcDriverConnect(connection="Driver={SQL Server};Server={DESKTOP-U2P5V4F};Database={};Uid={vbuser};Pwd={Th!nkvbuser};")
+# test <- sqlQuery(con_debug, )

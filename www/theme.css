@@ -1,0 +1,23 @@
+.skin-red .main-header .logo {
+    background-color: #D51067;
+}
+
+.skin-red .main-header .logo:hover {
+    background-color: #802245;
+}
+
+.skin-red .main-header .navbar {
+    background-color: #D51067;
+}
+
+.skin-red .main-header .navbar .sidebar-toggle:hover {
+    background-color: #802245;
+}
+
+.skin-red .sidebar-menu>li.active>a,.skin-red .sidebar-menu>li:hover>a {
+    border-left-color: #D51067;
+}
+
+.nav-tabs-custom>.nav-tabs>li.active {
+    border-top-color: #D51067;
+}

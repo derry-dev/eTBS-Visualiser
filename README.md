@@ -9,7 +9,15 @@ In order to use the eTBS visualiser on your local PC, you must first [install R]
 Once R is installed, open the R console and run the command below to install the required R packages for the visualiser to function correctly:
 
 ```r
-install.packages(c("shiny", "shinydashboard", "shinyWidgets", "leaflet", "RColorBrewer", "data.table", "here", "magrittr", "RODBC"))
+install.packages(
+  c(
+    "shiny", "shinydashboard", "shinyWidgets", "RODBC", "data.table",
+    "DT", "leaflet", "sp", "RColorBrewer", "mapview", "magrittr", "plotly"
+  ),
+  repos = "https://cloud.r-project.org",
+  dependencies = T
+)
+webshot::install_phantomjs()
 ```
 
 After the packages are installed, run the following commands to launch the visualiser:
@@ -25,11 +33,19 @@ Alternatively, you can [install RStudio](https://www.rstudio.com/products/rstudi
 
 ### Editing the Visualiser
 
-RStudio is recommended for development of the visualiser. It is not recommended to move any files within the **eTBS Visualiser** folder as this will break functionality.
+RStudio is recommended for development of the visualiser. Please see the developer if you require a version controlled copy of the visualiser project.
 
 ---
 
 ## Version Notes
+
+25/06/2019
+
+* Complete Rework
+* Data is no longer saved locally (queried directly from database)
+* Added Database Dashboard with Query Tool
+* Adapted PLT Map to new eTBS data
+* Improved CSS
 
 14/02/2019
 
