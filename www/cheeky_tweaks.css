@@ -1,3 +1,7 @@
 #pltmap {
-   height: calc(100vh - 50px) !important;
+   height: calc(100vh - 110px) !important;
+}
+
+.bootstrap-select:not(.input-group-btn), .bootstrap-select[class*=col-] {
+   background: none;
 }

@@ -4,7 +4,37 @@
 
 header <- dashboardHeader(
   title = "eTBS Visualiser",
-  titleWidth = 250
+  titleWidth = 250,
+  tags$li(class = "dropdown header_button", id = "db_button", icon("database")),
+  tags$li(class = "dropdown logo", style = "width: 125px; height: 50px; padding-left: 15px; padding-right: 15px;", imageOutput("think_logo"))
+)
+
+# ----------------------------------------------------------------------- #
+# Sidebar Menu Items ------------------------------------------------------
+# ----------------------------------------------------------------------- #
+
+sidebar_tab_db <- menuItem(
+  text = "Database Dashboard",
+  tabName = "tab_db",
+  icon = icon("database")
+)
+
+sidebar_tab_plt <- menuItem(
+  text = "Path Leg Tracking",
+  tabName = "tab_plt",
+  icon = icon("map-marker-alt")
+)
+
+sidebar_tab_ord_cali <- menuItem(
+  text = "Calibration",
+  tabName = "tab_ord_cali",
+  icon = icon("cog")
+)
+
+sidebar_tab_ord <- menuItem(
+  text = "Optimised Runway Delivery",
+  tabName = "tab_ord",
+  icon = icon("plane-arrival")
 )
 
 # ----------------------------------------------------------------------- #
@@ -12,46 +42,119 @@ header <- dashboardHeader(
 # ----------------------------------------------------------------------- #
 
 sidebar <- dashboardSidebar(
-  collapsed	= T,
+  collapsed	= F,
   width = 250,
   sidebarMenu(
     id = "tabs",
-    menuItem(
-      text = "Database Dashboard",
-      tabName = "tab_db",
-      icon = icon("database")
-    ),
-    menuItem(
-      text = "Path Leg Tracking",
-      tabName = "tab_plt",
-      icon = icon("map-marker-alt"),
-      menuItem(
-        text = "Track Visualiser",
-        tabName = "tab_pltmap",
-        icon = icon("map-marked-alt")
-      ),
-      menuItem(
-        text = "Plots & Analysis",
-        tabName = "tab_pltplot",
-        icon = icon("chart-line")
-      )
-    ),
-    menuItem(
-      text = "Optimised Runway Delivery",
-      tabName = "tab_ord",
-      icon = icon("plane-arrival"),
-      menuItem(
-        text = "Calibration",
-        tabName = "tab_ordcali",
-        icon = icon("cog")
-      ),
-      menuItem(
-        text = "Validation",
-        tabName = "tab_ordvali",
-        icon = icon("clipboard-check")
+    sidebar_tab_db,
+    sidebar_tab_plt,
+    sidebar_tab_ord
+  )
+)
+
+# ----------------------------------------------------------------------- #
+# CSS/JS ------------------------------------------------------------------
+# ----------------------------------------------------------------------- #
+
+www <- tagList(
+  tags$link(rel = "stylesheet", type = "text/css", href = "header_buttons.css"),
+  tags$link(rel = "stylesheet", type = "text/css", href = "theme.css"),
+  tags$link(rel = "stylesheet", type = "text/css", href = "wrappers.css"),
+  tags$link(rel = "stylesheet", type = "text/css", href = "cheeky_tweaks.css"),
+  tags$link(rel = "stylesheet", type = "text/css", href = "loading_v2.css"),
+  tags$link(rel = "stylesheet", type = "text/css", href = "bttn.min.css"),
+  tags$script(HTML("$('body').addClass('fixed');")),
+  tags$script(src = "pltmap.js")
+)
+
+# ----------------------------------------------------------------------- #
+# Body Tab Items ----------------------------------------------------------
+# ----------------------------------------------------------------------- #
+
+body_tab_db <- tabItem(
+  "tab_db",
+  tabBox(
+    title = "Database Explorer",
+    side = "right",
+    width = NULL,
+    selected = "Query Tool",
+    tabPanel("Table List", DT::dataTableOutput("db_databases")),
+    tabPanel(
+      "Query Tool",
+      box(
+        solidHeader = T,
+        collapsible  = F,
+        width = NULL,
+        textAreaInput(
+          "db_query",
+          NA,
+          placeholder = "Enter your query here...",
+          width = "100%",
+          height = "246px",
+          resize = "vertical"
+        ),
+        div(
+          class = "centered",
+          actionButton("db_execute", "Execute", icon("play")),
+          div(style = "margin: 0 5px 0 5px"),
+          actionButton("db_clear", "Clear", icon("eraser"))
+        ),
+        DT::dataTableOutput("db_output")
       )
     )
   )
+)
+
+body_tab_plt <- tabItem(
+  "tab_plt",
+  box(
+    width = NULL,
+    leafletOutput("pltmap"),
+    uiOutput("pltmap_filters_ui")
+  ),
+  tabBox(
+    title = "Tables",
+    side = "right",
+    width = NULL,
+    selected = "Flight Plans",
+    tabPanel("Legs", DT::dataTableOutput("plt_legs")),
+    tabPanel("Volumes", DT::dataTableOutput("plt_volumes")),
+    tabPanel("Flight Plans", DT::dataTableOutput("plt_flightplans")),
+    tabPanel("Plotted Tracks", DT::dataTableOutput("plt_tracks"))
+  )
+)
+
+body_tab_ord <- tabItem(
+  "tab_ord",
+  tabBox(
+    title = "Calibration",
+    side = "right",
+    width = NULL,
+    selected = "IAS Profile",
+    tabPanel(
+      "IAS Profile",
+      div(
+        style = "display: flex; justify-content: space-around",
+        pickerInput("iasprofile_dates", "Select Date", NULL, multiple=T, options = list(`actions-box` = T, `live-search` = T), width="200px"),
+        pickerInput("iasprofile_callsigns", "Select Callsign", NULL, multiple=T, options = list(`actions-box` = T, `live-search` = T), width="200px")
+      ),
+      uiOutput("ord_iasprofile_ui"),
+      verbatimTextOutput("ord_iasprofile_nls"),
+      # plotlyOutput("ord_iasprofile"),
+      hr(),
+      div(style = "margin-bottom: 15px; font-size: 15px;", "ORD Calibration View"),
+      DT::dataTableOutput("ord_cali_table")
+    )
+  )
+)
+
+# ----------------------------------------------------------------------- #
+# Loading Message ---------------------------------------------------------
+# ----------------------------------------------------------------------- #
+
+loading <- conditionalPanel(
+  condition="$('html').hasClass('shiny-busy')",
+  div(id="loadmessage", uiOutput("spinner"))
 )
 
 # ----------------------------------------------------------------------- #
@@ -59,141 +162,23 @@ sidebar <- dashboardSidebar(
 # ----------------------------------------------------------------------- #
 
 body <- dashboardBody(
-  tags$link(rel = "stylesheet", type = "text/css", href = "theme.css"),
-  tags$link(rel = "stylesheet", type = "text/css", href = "wrappers.css"),
-  tags$link(rel = "stylesheet", type = "text/css", href = "cheeky_tweaks.css"),
-  tags$link(rel = "stylesheet", type = "text/css", href = "loading.css"),
-  tags$link(rel = "stylesheet", type = "text/css", href = "bttn.min.css"),
-  tags$script(HTML("$('body').addClass('fixed');")),
-  tags$script(src = "pltmap.js"),
+  useShinyjs(),
+  www,
   tabItems(
-    tabItem(
-      "tab_db",
-      fluidRow(
-        column(
-          3,
-          box(
-            title = "Connection Manager",
-            solidHeader = T,
-            collapsible  = F,
-            width = NULL,
-            fluidPage(
-              textInput("db_driver", "Driver Name", "SQL Server"),
-              textInput("db_server", "Server Name", "DESKTOP-U2P5V4F"),
-              textInput("db_database", "Database Name", "eTBS_UTMA_Validation_V002a"),
-              textInput("db_username", "Username", "vbuser"),
-              passwordInput("db_password", "Password", "Th!nkvbuser"),
-              div(
-                class = "centered",
-                actionButton("db_connect", "Connect", icon("database")),
-                uiOutput("db_status")
-              )
-            )
-          )
-        ),
-        column(
-          9,
-          tabBox(
-            title = "Database Explorer",
-            side = "right",
-            width = NULL,
-            selected = "Query Tool",
-            tabPanel("Table List", DT::dataTableOutput("db_databases")),
-            tabPanel(
-              "Query Tool",
-              box(
-                solidHeader = T,
-                collapsible  = F,
-                width = NULL,
-                textAreaInput(
-                  "db_query",
-                  NA,
-                  placeholder = "Enter your query here...",
-                  width = "100%",
-                  height = "246px",
-                  resize = "vertical"
-                ),
-                div(
-                  class = "centered",
-                  actionButton("db_execute", "Execute", icon("play")),
-                  div(style = "margin: 0 5px 0 5px"),
-                  actionButton("db_clear", "Clear", icon("eraser"))
-                ),
-                DT::dataTableOutput("db_output")
-              )
-            )
-          )
-        )
-      )
-    ),
-    tabItem(
-      "tab_pltmap",
-      div(id = "pltmap_wrapper", style = "margin: -15px;", leafletOutput("pltmap", height="100%")),
-      div(
-        style = "position: absolute; top: 60px;",
-        dropdown(
-          pickerInput("pltmap_fpdate", "Select Date", NULL, multiple=T),
-          pickerInput("pltmap_fpid", "Select FP ID", NULL, multiple=T, options = list(`actions-box` = TRUE)),
-          # pickerInput("pltmap_legs", "Filter By Leg", NULL, multiple=T, options = list(`actions-box` = TRUE)),
-          div(
-            class = "centered",
-            actionButton("pltmap_update", "Update", icon = icon("sync-alt"))
-          ),
-          hr(),
-          pickerInput("pltmap_volumes", "Display Volumes", NULL, multiple=T, options = list(`actions-box` = TRUE)),
-          style = "simple",
-          icon = icon("filter"),
-          tooltip = tooltipOptions(title = "Filtering Options", placement = "right")
-        ),
-        div(style = "height: 5px"),
-        downloadButton("pltmap_screenshot", NULL, class = "bttn-simple"),
-        div(style = "height: 5px"),
-        uiOutput("plt_tracks_button")
-      )
-    ),
-    tabItem(
-      "tab_pltplot",
-      fluidRow(
-        column(
-          3,
-          box(
-            solidHeader = T,
-            collapsible  = F,
-            width = NULL
-            
-          )
-        ),
-        column(
-          9,
-          box(
-            solidHeader = T,
-            collapsible  = F,
-            width = NULL
-            
-          )
-        )
-      ),
-      tabBox(
-        title = "Tables",
-        side = "right",
-        width = NULL,
-        selected = "Flight Plans",
-        tabPanel("Legs", DT::dataTableOutput("db_legs")),
-        tabPanel("Volumes", DT::dataTableOutput("db_volumes")),
-        tabPanel("Flight Plans", DT::dataTableOutput("db_flightplans"))
-      )
-    ),
-    tabItem("tab_ordcali", "ord calidation"),
-    tabItem("tab_ordvali", "ord valibration")
+    body_tab_db,
+    body_tab_plt,
+    body_tab_ord
   ),
-  conditionalPanel(
-    condition="$('html').hasClass('shiny-busy')",
-    div(id="loadmessage", "Loading, please wait...")
-  )
+  loading
 )
 
 # ----------------------------------------------------------------------- #
 # Page --------------------------------------------------------------------
 # ----------------------------------------------------------------------- #
 
-dashboardPage(skin = "red", header, sidebar, body)
+dashboardPage(
+  skin = "red",
+  header,
+  sidebar,
+  body
+)

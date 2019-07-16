@@ -11,8 +11,8 @@ Once R is installed, open the R console and run the command below to install the
 ```r
 install.packages(
   c(
-    "shiny", "shinydashboard", "shinyWidgets", "RODBC", "data.table",
-    "DT", "leaflet", "sp", "RColorBrewer", "mapview", "magrittr", "plotly"
+    "shiny", "shinyjs", "shinydashboard", "shinyWidgets", "RODBC", "data.table", "DT",
+    "leaflet", "sp", "RColorBrewer", "mapview", "plyr", "dplyr", "plotly"
   ),
   repos = "https://cloud.r-project.org",
   dependencies = T
@@ -38,6 +38,27 @@ RStudio is recommended for development of the visualiser. Please see the develop
 ---
 
 ## Version Notes
+
+16/07/2019
+
+* Added PLT marker & polygon customisation
+* Restored additional PLT map tiles
+* Known issue: PLT screenshot tool not working
+
+10/07/2019
+
+* Added ORD Calibration View NLS modelling
+* PLT Map and General Bug Fixes
+* New loading animation
+
+09/07/2019
+
+* Added ORD functions
+* Fixed volumes not displaying in PLT map
+* Enabled PLT map track filtering by path leg
+* Enabled real-time updating of PLT map based on selection
+* Changed default PLT map tile to CartoDB.DarkMatter
+* Fixed PLT map markers/volumes not appearing in screenshot
 
 25/06/2019
 

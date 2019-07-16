@@ -7,6 +7,7 @@
 <meta charset="utf-8" />
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
 
@@ -342,18 +343,6 @@ summary {
 }
 </style>
 
-<script>
-$(document).ready(function () {
-  window.buildTabsets("TOC");
-});
-
-$(document).ready(function () {
-  $('.tabset-dropdown > .nav-tabs > li').click(function () {
-    $(this).parent().toggleClass('nav-tabs-open')
-  });
-});
-</script>
-
 <!-- code folding -->
 
 
@@ -387,8 +376,8 @@ $(document).ready(function () {
 <p>Once R is installed, open the R console and run the command below to install the required R packages for the visualiser to function correctly:</p>
 <pre class="r"><code>install.packages(
   c(
-    &quot;shiny&quot;, &quot;shinydashboard&quot;, &quot;shinyWidgets&quot;, &quot;RODBC&quot;, &quot;data.table&quot;,
-    &quot;DT&quot;, &quot;leaflet&quot;, &quot;sp&quot;, &quot;RColorBrewer&quot;, &quot;mapview&quot;, &quot;magrittr&quot;, &quot;plotly&quot;
+    &quot;shiny&quot;, &quot;shinyjs&quot;, &quot;shinydashboard&quot;, &quot;shinyWidgets&quot;, &quot;RODBC&quot;, &quot;data.table&quot;, &quot;DT&quot;,
+    &quot;leaflet&quot;, &quot;sp&quot;, &quot;RColorBrewer&quot;, &quot;mapview&quot;, &quot;plyr&quot;, &quot;dplyr&quot;, &quot;plotly&quot;
   ),
   repos = &quot;https://cloud.r-project.org&quot;,
   dependencies = T
@@ -409,6 +398,27 @@ shiny::runApp(&quot;eTBS Visualiser&quot;, launch.browser = TRUE)</code></pre>
 </div>
 <div id="version-notes" class="section level2">
 <h2>Version Notes</h2>
+<p>16/07/2019</p>
+<ul>
+<li>Added PLT marker &amp; polygon customisation</li>
+<li>Restored additional PLT map tiles</li>
+<li>Known issue: PLT screenshot tool not working</li>
+</ul>
+<p>10/07/2019</p>
+<ul>
+<li>Added ORD Calibration View NLS modelling</li>
+<li>PLT Map and General Bug Fixes</li>
+<li>New loading animation</li>
+</ul>
+<p>09/07/2019</p>
+<ul>
+<li>Added ORD functions</li>
+<li>Fixed volumes not displaying in PLT map</li>
+<li>Enabled PLT map track filtering by path leg</li>
+<li>Enabled real-time updating of PLT map based on selection</li>
+<li>Changed default PLT map tile to CartoDB.DarkMatter</li>
+<li>Fixed PLT map markers/volumes not appearing in screenshot</li>
+</ul>
 <p>25/06/2019</p>
 <ul>
 <li>Complete Rework</li>
@@ -452,6 +462,23 @@ $(document).ready(function () {
 
 
 </script>
+
+<!-- tabsets -->
+
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open')
+  });
+});
+</script>
+
+<!-- code folding -->
+
 
 <!-- dynamically load mathjax for compatibility with self-contained -->
 <script>
