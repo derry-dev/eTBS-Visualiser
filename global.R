@@ -195,3 +195,17 @@ airspeed_model_break <- function(x, a, a1, b, n1, n2) {
 airspeed_model_vector_break <- function(x, a, a1, b, n1, n2){
   sapply(x, airspeed_model_break, a = a, a1 = a1, b = b, n1 = n1, n2 = n2, simplify = T) 
 }
+
+airspeed_model_break_2 <- function(x, a, a1) {
+  return(
+    if (x < 1) {
+      a
+    } else {
+      a1
+    }
+  )
+}
+
+airspeed_model_vector_break_2 <- function(x, a, a1) {
+  sapply(x, airspeed_model_break_2, a = a, a1 = a1, simplify = T)
+}

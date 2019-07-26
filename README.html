@@ -383,21 +383,39 @@ summary {
   dependencies = T
 )
 webshot::install_phantomjs()</code></pre>
-<p>After the packages are installed, run the following commands to launch the visualiser:</p>
+<p>After the packages are installed, there are two ways to launch the visualiser:</p>
+<ol style="list-style-type: decimal">
+<li><p><a href="https://www.rstudio.com/products/rstudio/download/#download">Install RStudio</a>, open any of the files <strong>global.R</strong>, <strong>ui.R</strong> or <strong>server.R</strong> in RStudio, install the required R packages and click the run icon on the top right-hand side of the source window.</p></li>
+<li><p>In the R console, run the following commands:</p></li>
+</ol>
 <pre class="r"><code># Replace the file path with the directory containing the eTBS Visualiser folder
 setwd(&quot;C:/Users/USER NAME/Documents/&quot;)
 
 shiny::runApp(&quot;eTBS Visualiser&quot;, launch.browser = TRUE)</code></pre>
-<p>Alternatively, you can <a href="https://www.rstudio.com/products/rstudio/download/#download">install RStudio</a>, open any of the files <strong>global.R</strong>, <strong>ui.R</strong> or <strong>server.R</strong> in RStudio, install the required R packages and click the run icon on the top right-hand side of the source window.</p>
+<p>It is recommended to use a modern web browser such as Google Chrome, Mozilla Firefox or Opera, you may encounter issues such as missing UI elements if you attempt to use the visualiser using older browsers such as Microsoft Edge or Internet Explorer.</p>
 </div>
 <div id="editing-the-visualiser" class="section level3">
 <h3>Editing the Visualiser</h3>
-<p>RStudio is recommended for development of the visualiser. Please see the developer if you require a version controlled copy of the visualiser project.</p>
+<p>If you encounter any issues while using the visualiser or would like to contribute to the addition of new features, RStudio is recommended for development of the visualiser. Please see the developer if you require a version controlled copy of the visualiser project and create a pull request if you wish to merge your commits with the master branch.</p>
 <hr />
 </div>
 </div>
 <div id="version-notes" class="section level2">
 <h2>Version Notes</h2>
+<p>26/07/2019</p>
+<ul>
+<li>Enabled ORD Calibration View NLS Model Plot</li>
+<li>Added simplified models on NLS model failure</li>
+<li>Server.R commenting</li>
+<li>Minor layout fixes</li>
+</ul>
+<p>18/07/2019</p>
+<ul>
+<li>Fixed PLT screenshot not working</li>
+<li>Fixed PLT screenshot map tile issue</li>
+<li>Fixed PLT screenshot location/zoom issue</li>
+<li>Added PLT map leg legend</li>
+</ul>
 <p>16/07/2019</p>
 <ul>
 <li>Added PLT marker &amp; polygon customisation</li>

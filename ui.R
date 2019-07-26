@@ -139,8 +139,10 @@ body_tab_ord <- tabItem(
         pickerInput("iasprofile_callsigns", "Select Callsign", NULL, multiple=T, options = list(`actions-box` = T, `live-search` = T), width="200px")
       ),
       uiOutput("ord_iasprofile_ui"),
-      verbatimTextOutput("ord_iasprofile_nls"),
-      # plotlyOutput("ord_iasprofile"),
+      fluidRow(
+        column(10, plotlyOutput("ord_iasprofile")),
+        column(2, verbatimTextOutput("ord_iasprofile_nls"))
+      ),
       hr(),
       div(style = "margin-bottom: 15px; font-size: 15px;", "ORD Calibration View"),
       DT::dataTableOutput("ord_cali_table")

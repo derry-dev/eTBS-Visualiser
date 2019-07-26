@@ -20,7 +20,11 @@ install.packages(
 webshot::install_phantomjs()
 ```
 
-After the packages are installed, run the following commands to launch the visualiser:
+After the packages are installed, there are two ways to launch the visualiser:
+
+1. [Install RStudio](https://www.rstudio.com/products/rstudio/download/#download), open any of the files **global.R**, **ui.R** or **server.R** in RStudio, install the required R packages and click the run icon on the top right-hand side of the source window.
+
+2. In the R console, run the following commands:
 
 ```r
 # Replace the file path with the directory containing the eTBS Visualiser folder
@@ -29,15 +33,29 @@ setwd("C:/Users/USER NAME/Documents/")
 shiny::runApp("eTBS Visualiser", launch.browser = TRUE)
 ```
 
-Alternatively, you can [install RStudio](https://www.rstudio.com/products/rstudio/download/#download), open any of the files **global.R**, **ui.R** or **server.R** in RStudio, install the required R packages and click the run icon on the top right-hand side of the source window.
+It is recommended to use a modern web browser such as Google Chrome, Mozilla Firefox or Opera, you may encounter issues such as missing UI elements if you attempt to use the visualiser using older browsers such as Microsoft Edge or Internet Explorer.
 
 ### Editing the Visualiser
 
-RStudio is recommended for development of the visualiser. Please see the developer if you require a version controlled copy of the visualiser project.
+If you encounter any issues while using the visualiser or would like to contribute to the addition of new features, RStudio is recommended for development of the visualiser. Please see the developer if you require a version controlled copy of the visualiser project and create a pull request if you wish to merge your commits with the master branch.
 
 ---
 
 ## Version Notes
+
+26/07/2019
+
+* Enabled ORD Calibration View NLS Model Plot
+* Added simplified models on NLS model failure
+* Server.R commenting
+* Minor layout fixes
+
+18/07/2019
+
+* Fixed PLT screenshot not working
+* Fixed PLT screenshot map tile issue
+* Fixed PLT screenshot location/zoom issue
+* Added PLT map leg legend
 
 16/07/2019
 

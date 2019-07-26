@@ -15,18 +15,18 @@ function(input, output, session) {
     htmltools::HTML('<i class="fa fa-spinner fa-spin fa-3x fa-fw" style="font-size:24px"></i>')
   })
   
-  # ----------------------------------------------------------------------- #
-  # Database Connection -----------------------------------------------------
-  # ----------------------------------------------------------------------- #
-  
+  # Start-up show database connection dialogue
   showModal(connection_dialogue())
   
+  # Show database connection dialogue on button click
   onclick("db_button", showModal(connection_dialogue()))
   
+  # Database connection
   con <- eventReactive(input$db_connect, {
     valueExpr = get_db_connection(input$db_driver, input$db_server, input$db_database, input$db_username, input$db_password)
   })
   
+  # Database connection status feedback
   observeEvent(con(), {
     output$db_status <- renderUI({
       if (con() != -1L) {
@@ -37,11 +37,8 @@ function(input, output, session) {
     })
   })
   
-  # ----------------------------------------------------------------------- #
-  # PLT Base Map ------------------------------------------------------------
-  # ----------------------------------------------------------------------- #
-  
-  pltmap <- reactive({
+  # Render PLT map tiles
+  output$pltmap <- renderLeaflet({
     leaflet(options = leafletOptions(zoomControl = F, preferCanvas = T)) %>%
       setView(lng = -0.45, lat = 51.46, zoom = 10) %>%
       addProviderTiles(providers$Esri.WorldImagery, options=providerTileOptions(noWrap=TRUE), group="Satellite") %>%
@@ -54,20 +51,15 @@ function(input, output, session) {
       addLayersControl(baseGroups=c("Satellite","Grey","Dark","Light","Topo","OSM","OSM B&W"), options=layersControlOptions(collapsed=T))
   })
   
-  # Render map tiles
-  output$pltmap <- renderLeaflet({
-    pltmap()
-  })
-  
   observe({
     
+    # Runs only when database connection is valid
     if (con() != -1L) {
       
       if (input$tabs == "tab_db") {
-        
-        # ----------------------------------------------------------------------- #
-        # Query Tool --------------------------------------------------------------
-        # ----------------------------------------------------------------------- #
+      # ----------------------------------------------------------------------- #
+      # Database Tab ------------------------------------------------------------
+      # ----------------------------------------------------------------------- #
         
         # Get custom query
         query <- eventReactive(input$db_execute, {
@@ -94,10 +86,6 @@ function(input, output, session) {
           updateTextAreaInput(session, "db_query", value="")
         })
         
-        # ----------------------------------------------------------------------- #
-        # Database List -----------------------------------------------------------
-        # ----------------------------------------------------------------------- #
-        
         # Get list of databases, schemas and tables
         db_list <- reactive({
           query_table_list %>% sqlQuery(con(),.) %>% as.data.table()
@@ -119,24 +107,26 @@ function(input, output, session) {
         })
         
       } else if (input$tabs == "tab_plt") {
+      # ----------------------------------------------------------------------- #
+      # PLT Tab -----------------------------------------------------------------
+      # ----------------------------------------------------------------------- #
         
-        # ----------------------------------------------------------------------- #
-        # PLT Datasets ------------------------------------------------------------
-        # ----------------------------------------------------------------------- #
-        
-        
+        # tbl_Flight_Plan
         flightplan <- reactive({
           query_flightplan %>% sqlQuery(con(),.) %>% as.data.table()
         })
         
+        # tbl_Polygon
         volumes <- eventReactive(con(), {
           query_volumes %>% sqlQuery(con(),.) %>% as.data.table()
         })
         
+        # tbl_Path_Leg
         legs <- eventReactive(con(), {
           query_legs %>% sqlQuery(con(),.) %>% as.data.table()
         })
         
+        # Subsetted tbl_Radar_Track_Point
         tracks <- eventReactive(input$pltmap_fpid, {
           sprintf(
             "%s WHERE Flight_Plan_ID IN ('%s')",
@@ -147,13 +137,10 @@ function(input, output, session) {
             .[is.na(Path_Leg), Path_Leg := "NA"]
         })
         
-        # ----------------------------------------------------------------------- #
-        # PLT Map Filters ---------------------------------------------------------
-        # ----------------------------------------------------------------------- #
-        
+        # PLT Map Top Left Dropdown & Screenshot Buttons
         output$pltmap_filters_ui <- renderUI({
           div(
-            style = "position: absolute; left: 20px; top: 21px;",
+            style = "position: absolute; left: 20px; top: 21px; z-index: 100",
             dropdown(
               pickerInput("pltmap_fpdate", "Select Date", NULL, multiple=T, options = list(`actions-box` = T, `live-search` = T), width="220px"),
               pickerInput("pltmap_fpid", "Select FP ID", NULL, multiple=T, options = list(`actions-box` = T, `live-search` = T), width="220px"),
@@ -206,7 +193,7 @@ function(input, output, session) {
                 textInput("pltmap_volume_highlightcolour_b", "", 0, width="46px")
               ),
               style = "simple",
-              icon = icon("shapes"),
+              icon = icon("th"),
               tooltip = tooltipOptions(title = "Polygon Settings", placement = "right")
             ),
             div(style = "height: 5px"),
@@ -214,6 +201,7 @@ function(input, output, session) {
           )
         })
         
+        # Update Date Filter Choices
         observeEvent(flightplan(), {
           updatePickerInput(
             session,
@@ -222,6 +210,7 @@ function(input, output, session) {
           )
         })
         
+        # Update FPID Filter Choices
         observeEvent(input$pltmap_fpdate, {
           pltmap_fpid_choices <- flightplan()[FP_Date %in% input$pltmap_fpdate]$Flight_Plan_ID %>% as.character() %>% unique() %>% sort()
           updatePickerInput(
@@ -232,6 +221,7 @@ function(input, output, session) {
           )
         })
         
+        # Update Volume Filter Choices
         observeEvent(volumes(), {
           updatePickerInput(
             session,
@@ -240,6 +230,7 @@ function(input, output, session) {
           )
         })
         
+        # Update Path Leg Filter Choices
         observeEvent(legs(), {
           pltmap_legs_choices <- legs()$Path_Leg_Name %>% as.character() %>% c(., "NA")
           updatePickerInput(
@@ -251,10 +242,7 @@ function(input, output, session) {
           )
         })
         
-        # ----------------------------------------------------------------------- #
-        # PLT Map Plotting --------------------------------------------------------
-        # ----------------------------------------------------------------------- #
-        
+        # PLT Map Track Point Labels
         pltmap_lab <- reactive({
           if (dim(tracks())[1] != 0 & dim(tracks())[2] != 0) {
             sprintf("
@@ -277,6 +265,7 @@ function(input, output, session) {
           }
         })
         
+        # Update PLT Map Volume Colour Selection (Red)
         observeEvent(input$pltmap_volume_colour_r, {
           if (is.na(as.numeric(input$pltmap_volume_colour_r))) {
             updateTextInput(session, "pltmap_volume_colour_r", value=0)
@@ -287,6 +276,7 @@ function(input, output, session) {
           }
         })
         
+        # Update PLT Map Volume Colour Selection (Green)
         observeEvent(input$pltmap_volume_colour_g, {
           if (is.na(as.numeric(input$pltmap_volume_colour_g))) {
             updateTextInput(session, "pltmap_volume_colour_g", value=0)
@@ -297,6 +287,7 @@ function(input, output, session) {
           }
         })
         
+        # Update PLT Map Volume Colour Selection (Blue)
         observeEvent(input$pltmap_volume_colour_b, {
           if (is.na(as.numeric(input$pltmap_volume_colour_b))) {
             updateTextInput(session, "pltmap_volume_colour_b", value=0)
@@ -307,6 +298,7 @@ function(input, output, session) {
           }
         })
         
+        # Update PLT Map Volume Highlight Colour Selection (Red)
         observeEvent(input$pltmap_volume_highlightcolour_r, {
           if (is.na(as.numeric(input$pltmap_volume_highlightcolour_r))) {
             updateTextInput(session, "pltmap_volume_highlightcolour_r", value=0)
@@ -317,6 +309,7 @@ function(input, output, session) {
           }
         })
         
+        # Update PLT Map Volume Highlight Colour Selection (Green)
         observeEvent(input$pltmap_volume_highlightcolour_g, {
           if (is.na(as.numeric(input$pltmap_volume_highlightcolour_g))) {
             updateTextInput(session, "pltmap_volume_highlightcolour_g", value=0)
@@ -327,6 +320,7 @@ function(input, output, session) {
           }
         })
         
+        # Update PLT Map Volume Highlight Colour Selection (Blue)
         observeEvent(input$pltmap_volume_highlightcolour_b, {
           if (is.na(as.numeric(input$pltmap_volume_highlightcolour_b))) {
             updateTextInput(session, "pltmap_volume_highlightcolour_b", value=0)
@@ -337,6 +331,7 @@ function(input, output, session) {
           }
         })
         
+        # Get PLT Map Volume Colour Based on RGB Selection
         pltmap_volume_colour <- reactive({
           r <- input$pltmap_volume_colour_r
           g <- input$pltmap_volume_colour_g
@@ -344,6 +339,7 @@ function(input, output, session) {
           return(paste0("rgb(",r,",",g,",",b,")"))
         })
         
+        # Get PLT Map Volume Highlight Colour Based on RGB Selection
         pltmap_volume_highlightcolour <- reactive({
           r <- input$pltmap_volume_highlightcolour_r
           g <- input$pltmap_volume_highlightcolour_g
@@ -351,22 +347,17 @@ function(input, output, session) {
           return(paste0("rgb(",r,",",g,",",b,")"))
         })
         
+        # Placeholder for additional PLT map elements displayed (for screenshotting)
         update_pltmap <- reactiveValues(moved = F, markers = NULL, volumes = NULL)
         
-        observeEvent({
-          input$pltmap_move
-          input$pltmap_zoom
-        },{
-          update_pltmap$move <- T
-        })
-        
+        # Plot tracks
         observe({
           if (any(is.na(input$pltmap_legs))) {
             d <- tracks()[Path_Leg %in% input$pltmap_legs | is.na(Path_Leg)]
           } else {
             d <- tracks()[Path_Leg %in% input$pltmap_legs]
           }
-          p <- leafletProxy("pltmap", data=d) %>% clearGroup("Tracks")
+          p <- leafletProxy("pltmap", data=d) %>% clearGroup("Tracks") %>% removeControl("Leg_Legend")
           pal <- colorFactor(brewer.pal(11, input$pltmap_marker_palette), domain=legs()$Path_Leg_Name)
           p %>% addCircleMarkers(
             lng = ~Lon*180/pi,
@@ -380,10 +371,19 @@ function(input, output, session) {
             opacity=input$pltmap_marker_opacity,
             fillOpacity=input$pltmap_marker_fillopacity,
             group="Tracks"
-          )
+          ) %>%
+            addLegend(
+              position = "bottomleft",
+              title = "Leg",
+              pal = pal,
+              values = ~Path_Leg,
+              opacity = 0.85,
+              layerId = "Leg_Legend"
+            )
           update_pltmap$markers <- d
         })
         
+        # Plot volumes
         observe({
           p <- leafletProxy("pltmap") %>% clearGroup("Volumes")
           # pal <- colorFactor(brewer.pal(11, "Spectral"), domain=volumes()$Volume_Name)
@@ -413,10 +413,6 @@ function(input, output, session) {
           update_pltmap$volumes <- volumes()[Volume_Name %in% input$pltmap_volumes]
         })
         
-        # ----------------------------------------------------------------------- #
-        # PLT Map Screenshot ------------------------------------------------------
-        # ----------------------------------------------------------------------- #
-        
         # Map screenshot functionality
         output$pltmap_screenshot <- downloadHandler(
           filename = function() {
@@ -424,26 +420,35 @@ function(input, output, session) {
           },
           content = function(file) {
             
-            p <- pltmap()
+            p <- leaflet(options = leafletOptions(zoomControl = F, preferCanvas = T))
             
-            if (update_pltmap$moved == T) {
-              p <- p %>% setView(
-                lng = input$pltmap_center$lng,
-                lat = input$pltmap_center$lat,
-                zoom = input$pltmap_zoom
-              )
+            if (input$pltmap_groups == "Satellite") {
+              p <- p %>% addProviderTiles(providers$Esri.WorldImagery, options=providerTileOptions(noWrap=TRUE))
+            } else if (input$pltmap_groups == "Grey") {
+              p <- p %>% addProviderTiles(providers$CartoDB.Positron, options=providerTileOptions(noWrap=TRUE))
+            } else if (input$pltmap_groups == "Dark") {
+              p <- p %>% addProviderTiles(providers$CartoDB.DarkMatter, options=providerTileOptions(noWrap=TRUE))
+            } else if (input$pltmap_groups == "Light") {
+              p <- p %>% addProviderTiles(providers$Esri.WorldTopoMap, options=providerTileOptions(noWrap=TRUE))
+            } else if (input$pltmap_groups == "Topo") {
+              p <- p %>% addProviderTiles(providers$Esri.DeLorme, options=providerTileOptions(noWrap=TRUE))
+            } else if (input$pltmap_groups == "OSM") {
+              p <- p %>% addProviderTiles(providers$OpenStreetMap.Mapnik, options=providerTileOptions(noWrap=TRUE))
+            } else if (input$pltmap_groups == "OSM B&W") {
+              p <- p %>% addProviderTiles(providers$OpenStreetMap.BlackAndWhite, options=providerTileOptions(noWrap=TRUE))
             }
             
+            p <- p %>% setView(lng = input$pltmap_center$lng, lat = input$pltmap_center$lat, zoom = input$pltmap_zoom)
+            
             if (!is.null(update_pltmap$markers)) {
-              pal_markers <- colorFactor(brewer.pal(11, input$pltmap_marker_palette), domain=legs()$Path_Leg_Name)
-              p <- p %>% clearGroup("Tracks") %>%
+              pal <- colorFactor(brewer.pal(11, input$pltmap_marker_palette), domain=legs()$Path_Leg_Name)
+              p <- p %>% 
+                clearGroup("Tracks") %>%
                 addCircleMarkers(
                   data = update_pltmap$markers,
                   lng = ~Lon*180/pi,
                   lat = ~Lat*180/pi,
-                  color = ~pal_markers(Path_Leg),
-                  label=pltmap_lab(),
-                  labelOptions=labelOptions(textsize="13px", direction="auto"),
+                  color = ~pal(Path_Leg),
                   weight=input$pltmap_marker_weight,
                   radius=input$pltmap_marker_radius,
                   stroke=T,
@@ -452,7 +457,7 @@ function(input, output, session) {
                   group="Tracks"
                 )
             }
-            
+
             if (!is.null(update_pltmap$volumes)) {
               p <- p %>% clearGroup("Volumes")
               for (i in unique(update_pltmap$volumes$Volume_Name)) {
@@ -465,16 +470,6 @@ function(input, output, session) {
                   fillOpacity = input$pltmap_volume_fillopacity,
                   color = pltmap_volume_colour(),
                   dashArray = paste0(input$pltmap_volume_dash),
-                  # label = i,
-                  # labelOptions = labelOptions(style = list("font-weight" = "bold"), opacity = 1, textsize="12px", direction = "auto"),
-                  highlight = highlightOptions(
-                    weight = input$pltmap_volume_highlightweight,
-                    color = pltmap_volume_highlightcolour(),
-                    dashArray = "",
-                    opacity = input$pltmap_volume_highlightopacity,
-                    fillOpacity = input$pltmap_volume_highlightfillopacity,
-                    bringToFront = F
-                  ),
                   group = "Volumes"
                 )
               }
@@ -482,13 +477,11 @@ function(input, output, session) {
             
             mapshot(p, file = file, vwidth = input$pltDim[1], vheight = input$pltDim[2])
             
-          }
+          },
+          contentType = "image/png"
         )
         
-        # ----------------------------------------------------------------------- #
-        # PLT Tables --------------------------------------------------------------
-        # ----------------------------------------------------------------------- #
-        
+        # Render flightplan table
         output$plt_flightplans <- DT::renderDataTable({
           datatable(
             flightplan(),
@@ -503,6 +496,7 @@ function(input, output, session) {
           )
         })
         
+        # Render subsetted tracks table
         output$plt_tracks <- DT::renderDataTable({
           datatable(
             tracks(),
@@ -517,6 +511,7 @@ function(input, output, session) {
           )
         })
         
+        # Render volumes table
         output$plt_volumes <- DT::renderDataTable({
           datatable(
             volumes(),
@@ -531,6 +526,7 @@ function(input, output, session) {
           )
         })
         
+        # Render Path Legs table
         output$plt_legs <- DT::renderDataTable({
           datatable(
             legs(),
@@ -544,12 +540,11 @@ function(input, output, session) {
             )
           )
         })
-        
+      
       } else if (input$tabs == "tab_ord") {
-        
-        # ----------------------------------------------------------------------- #
-        # ORD Aircraft IAS Profile ------------------------------------------------
-        # ----------------------------------------------------------------------- #
+      # ----------------------------------------------------------------------- #
+      # ORD Tab -----------------------------------------------------------------
+      # ----------------------------------------------------------------------- #
         
         ord_dates <- reactive({
           query_vw_ORD_Calibration_View_Date %>% sqlQuery(con(), .) %>% unlist() %>% as.vector() %>% .[order(as.Date(., format="%d/%m/%y", origin="1970-01-01"))] %>% as.character()
@@ -618,16 +613,60 @@ function(input, output, session) {
               ),
               error = function(e) NULL
             )
+            if (is.null(m)) {
+              x <- x %>% .[. <= 2]
+              y <- y[1:length(x)]
+              m <- tryCatch(
+                nls(
+                  y ~ airspeed_model_vector_break_2(x, a, a1),
+                  start = list(a = 140, a1 = 140),
+                  control = nls.control(tol = 0.001, minFactor = 1/ 16384, warnOnly = T) 
+                ),
+                error = function(e) NULL
+              )
+              if (is.null(m)) {
+                m <- tryCatch(
+                  nls(
+                    y ~ a,
+                    start = list(a = 140),
+                    control = nls.control(tol = 0.001, minFactor = 1/ 16384, warnOnly = T) 
+                  ),
+                  error = function(e) NULL
+                )
+              }
+            }
           }
-          return(m)
+          return(list(d=d,x=x,y=y,m=m))
         })
         
         output$ord_iasprofile_nls <- renderText({
-          sprintf(
-            "%s\r\n%s",
-            "Model Output Parameters",
-            paste0(names(ord_cali_nls()$m$getAllPars()), ": ", ord_cali_nls()$m$getAllPars(), collapse = "\r\n")
+          paste0(
+            "Model Output Parameters\r\n",
+            paste0(names(ord_cali_nls()$m$m$getPars()), ": ", ord_cali_nls()$m$m$getPars(), collapse = "\r\n")
           )
+        })
+        
+        output$ord_iasprofile <- renderPlotly({
+          plot_ly() %>%
+            add_markers(
+              x = ord_cali_nls()$x,
+              y = ord_cali_nls()$y,
+              name = "Observed",
+              marker=list(color="rgb(85,87,89)")
+            ) %>%
+            add_lines(
+              x = ord_cali_nls()$x,
+              y = ord_cali_nls()$m$m$fitted(),
+              name = "Fitted",
+              line=list(color="rgb(213,16,103)")
+            ) %>% layout(
+              xaxis = list(title="Follower Range to Threshold (NM)"),
+              yaxis = list(title="Mode S IAS (kts)"),
+              showlegend = F
+            ) %>%
+            config(
+              displaylogo = F
+            )
         })
         
       }
