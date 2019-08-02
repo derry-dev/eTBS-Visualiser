@@ -25,12 +25,6 @@ sidebar_tab_plt <- menuItem(
   icon = icon("map-marker-alt")
 )
 
-sidebar_tab_ord_cali <- menuItem(
-  text = "Calibration",
-  tabName = "tab_ord_cali",
-  icon = icon("cog")
-)
-
 sidebar_tab_ord <- menuItem(
   text = "Optimised Runway Delivery",
   tabName = "tab_ord",
@@ -87,7 +81,7 @@ body_tab_db <- tabItem(
         width = NULL,
         textAreaInput(
           "db_query",
-          NA,
+          NULL,
           placeholder = "Enter your query here...",
           width = "100%",
           height = "246px",
@@ -130,23 +124,10 @@ body_tab_ord <- tabItem(
     title = "Calibration",
     side = "right",
     width = NULL,
-    selected = "IAS Profile",
-    tabPanel(
-      "IAS Profile",
-      div(
-        style = "display: flex; justify-content: space-around",
-        pickerInput("iasprofile_dates", "Select Date", NULL, multiple=T, options = list(`actions-box` = T, `live-search` = T), width="200px"),
-        pickerInput("iasprofile_callsigns", "Select Callsign", NULL, multiple=T, options = list(`actions-box` = T, `live-search` = T), width="200px")
-      ),
-      uiOutput("ord_iasprofile_ui"),
-      fluidRow(
-        column(10, plotlyOutput("ord_iasprofile")),
-        column(2, verbatimTextOutput("ord_iasprofile_nls"))
-      ),
-      hr(),
-      div(style = "margin-bottom: 15px; font-size: 15px;", "ORD Calibration View"),
-      DT::dataTableOutput("ord_cali_table")
-    )
+    selected = "By Aircraft Type",
+    # tabPanel("By Wake (RECAT)", uiOutput("ord_3")),
+    tabPanel("By Aircraft Type", uiOutput("ord_2")),
+    tabPanel("By Aircraft", uiOutput("ord_1"))
   )
 )
 

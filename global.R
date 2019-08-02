@@ -31,40 +31,32 @@ library(plotly)
 
 source("defaults.R", local = T)
 
+# ref_data <- fread(file.path(getwd(), "data", "01a ORD Configuration Output Type v1.3.csv"))
+
 # ----------------------------------------------------------------------- #
 # SQL Queries -------------------------------------------------------------
 # ----------------------------------------------------------------------- #
 
-# con_debug <- odbcDriverConnect(connection="Driver={SQL Server};Server={DESKTOP-U2P5V4F};Database={eTBS_UTMA_Validation_V002a};Uid={vbuser};Pwd={Th!nkvbuser};")
-# test <- sqlQuery(con_debug, "SELECT * FROM vw_ORD_Calibration_View
-# WHERE FP_Date IN ('01/01/19') AND Follower_Callsign IN ('AAL100')") %>% as.data.table()
-
-# Get list of all databases, schemas and tables
-query_table_list <- "
-  SET NOCOUNT ON
-  DECLARE @AllTables table (\"Database\" nvarchar(4000), \"Schema\" nvarchar(4000), \"Table\" nvarchar(4000))
-  INSERT INTO @AllTables (\"Database\", \"Schema\", \"Table\")
-  EXEC sp_msforeachdb 'select \"?\", s.name, t.name from [?].sys.tables t inner join sys.schemas s on t.schema_id=s.schema_id'
-  SET NOCOUNT OFF
-  SELECT * FROM @AllTables ORDER BY 1
-"
-
-# vw_ORD_Validation_View: This view generates the ORD Validation View output defined in UTMA_Validation_Tool_Requirements document
-query_vw_ORD_Validation_View <- "
-  SELECT * FROM vw_ORD_Validation_View
-"
-
-# vw_ORD_Calibration_View:  This view generates the ORD Calibration View output defined in UTMA_Validation_Tool_Requirements document
-query_vw_ORD_Calibration_View <- "
-  SELECT * FROM vw_ORD_Calibration_View
-"
-
-query_vw_ORD_Calibration_View_Date <- "
-  SELECT DISTINCT FP_Date AS Date FROM vw_ORD_Calibration_View
-"
-
-query_vw_ORD_Calibration_View_Callsigns <- "
-  SELECT DISTINCT FP_Date, Follower_Callsign AS Callsign FROM vw_ORD_Calibration_View
+query_vw_ORD_Calibration_View_Flights <- "
+  SELECT DISTINCT FP_Date
+      ,Leader_Callsign
+      ,Leader_Aircraft_Type
+      ,Leader_RECAT_Wake_Turbulence_Category
+      ,Follower_Callsign
+      ,Follower_Aircraft_Type
+      ,Follower_RECAT_Wake_Turbulence_Category
+      ,RECAT_Wake_Separation_Minimum
+      ,RECAT_ROT_Spacing_Minumum
+      ,Leader_4DME_Time
+      ,Follower_0DME_Time
+      ,Follower_0DME_RTT
+      ,Follower_Threshold_Surface_Headwind
+      ,Follower_Threshold_Surface_Wind_Speed
+      ,Follower_Threshold_Surface_Wind_Heading
+      ,Forecast_Follower_TBS_Wind_Effect
+      ,Delivered_4DME_Separation
+      ,Landing_Runway
+  FROM vw_ORD_Calibration_View
 "
 
 # eTBS Performance Model Data Output view
@@ -82,36 +74,6 @@ query_vw_All_Pair_Reference_Data <- "
 "
 query_vw_All_Pair_Radar_Track_Point <- "
   SELECT * FROM vw_All_Pair_Radar_Track_Point
-"
-
-# Flight Plan (PLT MAP)
-query_flightplan <- "
-  SELECT * FROM tbl_Flight_Plan
-  LEFT JOIN (
-    SELECT Flight_Plan_ID AS Flight_Plan_ID_2, Time_At_4DME, Time_At_1DME FROM tbl_Flight_Plan_Derived
-  ) AS t ON Flight_Plan_ID = Flight_Plan_ID_2
-"
-
-# Tracks (PLT MAP)
-query_tracks <- "
-  SELECT * FROM tbl_Radar_Track_Point
-  LEFT JOIN (
-    SELECT Radar_Track_Point_ID AS Radar_Track_Point_ID_2, Corrected_Mode_C, Range_To_Threshold, Range_To_ILS, Path_Leg
-    FROM tbl_Radar_Track_Point_Derived
-  ) AS t ON Radar_Track_Point_ID = Radar_Track_Point_ID_2
-"
-
-# Volumes (PLT MAP)
-query_volumes <- "
-  SELECT * FROM tbl_Polygon
-  LEFT JOIN (
-    SELECT Volume_Name AS Volume_Name_2, Min_Altitude, Max_Altitude FROM tbl_Volume
-  ) AS t ON Volume_Name = Volume_Name_2
-"
-
-# Legs (PLT MAP)
-query_legs <- "
-  SELECT * FROM tbl_Path_Leg
 "
 
 # ----------------------------------------------------------------------- #
@@ -155,6 +117,23 @@ get_db_connection <- function(str_driver, str_server, str_database, str_uid, str
 }
 
 # ----------------------------------------------------------------------- #
+# Debug dialogue ----------------------------------------------------------
+# ----------------------------------------------------------------------- #
+
+debug_dialogue <- function() {
+  modalDialog(
+    div(
+      class = "centered",
+      h4("session$clientData")
+    ),
+    verbatimTextOutput("clientdataText"),
+    size = "m",
+    footer = NULL,
+    easyClose = T
+  )
+}
+
+# ----------------------------------------------------------------------- #
 # ORD Calibration Functions -----------------------------------------------
 # ----------------------------------------------------------------------- #
 
@@ -178,7 +157,7 @@ airspeed_model_break <- function(x, a, a1, b, n1, n2) {
   if (n1 < 1) n1 <- 1
   if (n2 < n1 | abs(n2 - n1) < 0.1) n2 <- n1
   return(
-    if (x < 1){
+    if (x < 1) {
       a
     } else if (x >= 1 & x < n1) {
       a1

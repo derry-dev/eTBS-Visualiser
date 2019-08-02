@@ -1,5 +1,18 @@
 function(input, output, session) {
   
+  # Store client session data
+  cdata <- session$clientData
+  
+  # Debug session data display
+  onclick("think_logo", showModal(debug_dialogue()))
+  output$clientdataText <- renderText({
+    cnames <- names(cdata) %>% .[. %!in% grep("^output_spinner.*$", ., value=T)]
+    allvalues <- lapply(cnames, function(name) {
+      paste(name, cdata[[name]], sep = " = ")
+    })
+    paste(allvalues, collapse = "\n")
+  })
+  
   # Think Logo
   output$think_logo <- renderImage({
     list(
@@ -88,7 +101,13 @@ function(input, output, session) {
         
         # Get list of databases, schemas and tables
         db_list <- reactive({
-          query_table_list %>% sqlQuery(con(),.) %>% as.data.table()
+          " SET NOCOUNT ON
+            DECLARE @AllTables table (\"Database\" nvarchar(4000), \"Schema\" nvarchar(4000), \"Table\" nvarchar(4000))
+            INSERT INTO @AllTables (\"Database\", \"Schema\", \"Table\")
+            EXEC sp_msforeachdb 'select \"?\", s.name, t.name from [?].sys.tables t inner join sys.schemas s on t.schema_id=s.schema_id'
+            SET NOCOUNT OFF
+            SELECT * FROM @AllTables ORDER BY 1
+          " %>% sqlQuery(con(),.) %>% as.data.table()
         })
         
         # Render list of databases, schemas and tables
@@ -113,24 +132,39 @@ function(input, output, session) {
         
         # tbl_Flight_Plan
         flightplan <- reactive({
-          query_flightplan %>% sqlQuery(con(),.) %>% as.data.table()
+          " SELECT * FROM tbl_Flight_Plan
+            LEFT JOIN (
+              SELECT Flight_Plan_ID AS Flight_Plan_ID_2, Time_At_4DME, Time_At_1DME FROM tbl_Flight_Plan_Derived
+            ) AS t ON Flight_Plan_ID = Flight_Plan_ID_2
+          " %>% sqlQuery(con(),.) %>% as.data.table()
         })
         
         # tbl_Polygon
         volumes <- eventReactive(con(), {
-          query_volumes %>% sqlQuery(con(),.) %>% as.data.table()
+          " SELECT * FROM tbl_Polygon
+            LEFT JOIN (
+              SELECT Volume_Name AS Volume_Name_2, Min_Altitude, Max_Altitude FROM tbl_Volume
+            ) AS t ON Volume_Name = Volume_Name_2
+          " %>% sqlQuery(con(),.) %>% as.data.table()
         })
         
         # tbl_Path_Leg
         legs <- eventReactive(con(), {
-          query_legs %>% sqlQuery(con(),.) %>% as.data.table()
+          " SELECT * FROM tbl_Path_Leg
+          " %>% sqlQuery(con(),.) %>% as.data.table()
         })
         
         # Subsetted tbl_Radar_Track_Point
         tracks <- eventReactive(input$pltmap_fpid, {
           sprintf(
-            "%s WHERE Flight_Plan_ID IN ('%s')",
-            query_tracks, paste(input$pltmap_fpid, collapse = "','")
+            " SELECT * FROM tbl_Radar_Track_Point
+              LEFT JOIN (
+                SELECT Radar_Track_Point_ID AS Radar_Track_Point_ID_2, Corrected_Mode_C, Range_To_Threshold, Range_To_ILS, Path_Leg
+                FROM tbl_Radar_Track_Point_Derived
+              ) AS t ON Radar_Track_Point_ID = Radar_Track_Point_ID_2
+              WHERE Flight_Plan_ID IN ('%s')
+            ",
+            paste(input$pltmap_fpid, collapse = "','")
           ) %>%
             sqlQuery(con(),.) %>%
             as.data.table()  %>%
@@ -253,12 +287,12 @@ function(input, output, session) {
               <b>Range to ILS</b>: %s<br/>
               <b>Range to Threshold</b>: %s<br/>
               ",
-                    tracks()$Callsign, tracks()$Flight_Plan_ID,
-                    tracks()$Track_Date, tracks()$Track_Time, tracks()$Radar_Track_Point_ID,
-                    tracks()$Mode_C, tracks()$Corrected_Mode_C,
-                    tracks()$Path_Leg,
-                    tracks()$Range_To_ILS,
-                    tracks()$Range_To_Threshold
+              tracks()$Callsign, tracks()$Flight_Plan_ID,
+              tracks()$Track_Date, tracks()$Track_Time, tracks()$Radar_Track_Point_ID,
+              tracks()$Mode_C, tracks()$Corrected_Mode_C,
+              tracks()$Path_Leg,
+              tracks()$Range_To_ILS,
+              tracks()$Range_To_Threshold
             ) %>% lapply(htmltools::HTML)
           } else {
             NULL
@@ -267,68 +301,38 @@ function(input, output, session) {
         
         # Update PLT Map Volume Colour Selection (Red)
         observeEvent(input$pltmap_volume_colour_r, {
-          if (is.na(as.numeric(input$pltmap_volume_colour_r))) {
-            updateTextInput(session, "pltmap_volume_colour_r", value=0)
-          } else {
-            if (as.numeric(input$pltmap_volume_colour_r) > 255 | as.numeric(input$pltmap_volume_colour_r) < 0) {
-              updateTextInput(session, "pltmap_volume_colour_r", value=0)
-            }
-          }
+          x <- input$pltmap_volume_colour_r %>% as.numeric() %>% ifelse(is.na(.), -1, .)
+          if (x > 255 | x < 0) updateTextInput(session, "pltmap_volume_colour_r", value=0)
         })
         
         # Update PLT Map Volume Colour Selection (Green)
         observeEvent(input$pltmap_volume_colour_g, {
-          if (is.na(as.numeric(input$pltmap_volume_colour_g))) {
-            updateTextInput(session, "pltmap_volume_colour_g", value=0)
-          } else {
-            if (as.numeric(input$pltmap_volume_colour_g) > 255 | as.numeric(input$pltmap_volume_colour_g) < 0) {
-              updateTextInput(session, "pltmap_volume_colour_g", value=0)
-            }
-          }
+          x <- input$pltmap_volume_colour_g %>% as.numeric() %>% ifelse(is.na(.), -1, .)
+          if (x > 255 | x < 0) updateTextInput(session, "pltmap_volume_colour_g", value=0)
         })
         
         # Update PLT Map Volume Colour Selection (Blue)
         observeEvent(input$pltmap_volume_colour_b, {
-          if (is.na(as.numeric(input$pltmap_volume_colour_b))) {
-            updateTextInput(session, "pltmap_volume_colour_b", value=0)
-          } else {
-            if (as.numeric(input$pltmap_volume_colour_b) > 255 | as.numeric(input$pltmap_volume_colour_b) < 0) {
-              updateTextInput(session, "pltmap_volume_colour_b", value=0)
-            }
-          }
+          x <- input$pltmap_volume_colour_b %>% as.numeric() %>% ifelse(is.na(.), -1, .)
+          if (x > 255 | x < 0) updateTextInput(session, "pltmap_volume_colour_b", value=0)
         })
         
         # Update PLT Map Volume Highlight Colour Selection (Red)
         observeEvent(input$pltmap_volume_highlightcolour_r, {
-          if (is.na(as.numeric(input$pltmap_volume_highlightcolour_r))) {
-            updateTextInput(session, "pltmap_volume_highlightcolour_r", value=0)
-          } else {
-            if (as.numeric(input$pltmap_volume_highlightcolour_r) > 255 | as.numeric(input$pltmap_volume_highlightcolour_r) < 0) {
-              updateTextInput(session, "pltmap_volume_highlightcolour_r", value=0)
-            }
-          }
+          x <- input$pltmap_volume_highlightcolour_r %>% as.numeric() %>% ifelse(is.na(.), -1, .)
+          if (x > 255 | x < 0) updateTextInput(session, "pltmap_volume_highlightcolour_r", value=0)
         })
         
         # Update PLT Map Volume Highlight Colour Selection (Green)
         observeEvent(input$pltmap_volume_highlightcolour_g, {
-          if (is.na(as.numeric(input$pltmap_volume_highlightcolour_g))) {
-            updateTextInput(session, "pltmap_volume_highlightcolour_g", value=0)
-          } else {
-            if (as.numeric(input$pltmap_volume_highlightcolour_g) > 255 | as.numeric(input$pltmap_volume_highlightcolour_g) < 0) {
-              updateTextInput(session, "pltmap_volume_highlightcolour_g", value=0)
-            }
-          }
+          x <- input$pltmap_volume_highlightcolour_g %>% as.numeric() %>% ifelse(is.na(.), -1, .)
+          if (x > 255 | x < 0) updateTextInput(session, "pltmap_volume_highlightcolour_g", value=0)
         })
         
         # Update PLT Map Volume Highlight Colour Selection (Blue)
         observeEvent(input$pltmap_volume_highlightcolour_b, {
-          if (is.na(as.numeric(input$pltmap_volume_highlightcolour_b))) {
-            updateTextInput(session, "pltmap_volume_highlightcolour_b", value=0)
-          } else {
-            if (as.numeric(input$pltmap_volume_highlightcolour_b) > 255 | as.numeric(input$pltmap_volume_highlightcolour_b) < 0) {
-              updateTextInput(session, "pltmap_volume_highlightcolour_b", value=0)
-            }
-          }
+          x <- input$pltmap_volume_highlightcolour_b %>% as.numeric() %>% ifelse(is.na(.), -1, .)
+          if (x > 255 | x < 0) updateTextInput(session, "pltmap_volume_highlightcolour_b", value=0)
         })
         
         # Get PLT Map Volume Colour Based on RGB Selection
@@ -546,46 +550,260 @@ function(input, output, session) {
       # ORD Tab -----------------------------------------------------------------
       # ----------------------------------------------------------------------- #
         
-        ord_dates <- reactive({
-          query_vw_ORD_Calibration_View_Date %>% sqlQuery(con(), .) %>% unlist() %>% as.vector() %>% .[order(as.Date(., format="%d/%m/%y", origin="1970-01-01"))] %>% as.character()
+        ord_cali <- reactiveVal("SELECT TOP (0) * FROM vw_ORD_Calibration_View" %>% sqlQuery(con(), .) %>% as.data.table())
+        
+        output$ord_1 <- renderUI({
+          
+          ord_1_date_choices <- "
+          SELECT DISTINCT Convert(date, FP_Date, 3) FROM vw_ORD_Calibration_View
+          " %>% sqlQuery(con(), .) %>% unlist() %>% as.vector()
+          
+          fluidPage(
+            airDatepickerInput(
+              "ord_1_date",
+              "Select Date",
+              multiple = T,
+              separator = ", ",
+              dateFormat = "dd/mm/yyyy",
+              minDate = min(ord_1_date_choices),
+              maxDate = max(ord_1_date_choices),
+              disabledDates = seq(as.Date(min(ord_1_date_choices)), as.Date(max(ord_1_date_choices)), by=1) %>% .[as.character(.) %!in% ord_1_date_choices],
+              view = "months",
+              clearButton = T,
+              addon = "none",
+              width = "200px"
+            ),
+            div(style = "width: 15px"),
+            pickerInput(
+              "ord_1_callsign",
+              "Select Callsign",
+              choices = NULL,
+              multiple = T,
+              options = list(`actions-box` = T, `live-search` = T),
+              width = "200px"
+            ),
+            actionButton("ord_1_run", "Run Calibration"),
+            uiOutput("ord_output")
+          )
+          
         })
         
-        observeEvent(ord_dates(), {
+        observeEvent(input$ord_1_date, {
+          
+          ord_1_callsign_choices <- sprintf(
+            " SELECT DISTINCT FP_Date, Follower_Callsign, Follower_Aircraft_Type FROM vw_ORD_Calibration_View WHERE FP_Date IN ('%s')
+            ",
+            paste(input$ord_1_date %>% as.Date() %>% format("%d/%m/%y") %>% as.character(), collapse = "','")
+          ) %>% sqlQuery(con(), .) %>% as.data.table()
+          
           updatePickerInput(
             session,
-            "iasprofile_dates",
-            choices = ord_dates()
+            "ord_1_callsign",
+            choices = ord_1_callsign_choices$Follower_Callsign %>% as.character(),
+            choicesOpt = list(subtext = ord_1_callsign_choices[,paste(Follower_Aircraft_Type, FP_Date)] %>% as.character())
           )
+          
         })
         
-        ord_callsigns <- reactive({
-          sprintf(
-            "%s WHERE FP_Date IN ('%s')",
-            query_vw_ORD_Calibration_View_Callsigns,
-            paste(input$iasprofile_dates, collapse = "','")
-          ) %>%
-            sqlQuery(con(), .) %>% as.data.table()
+        onclick(
+          "ord_1_run",
+          ord_cali(
+            sprintf(
+              "SELECT * FROM vw_ORD_Calibration_View WHERE FP_Date IN ('%s') AND Follower_Callsign IN ('%s')",
+              paste(input$ord_1_date %>% as.Date() %>% format("%d/%m/%y") %>% as.character(), collapse = "','"),
+              paste(input$ord_1_callsign, collapse = "','")
+            ) %>% sqlQuery(con(), .) %>% as.data.table()
+          )
+        )
+        
+        output$ord_2 <- renderUI({
+          
+          ord_2_type_choices <- "
+          SELECT DISTINCT Follower_Aircraft_Type, COUNT(FP_Date+'_'+Follower_Callsign) AS Flight_Num
+          FROM (
+          	SELECT DISTINCT Follower_Aircraft_Type, FP_Date, Follower_Callsign FROM vw_ORD_Calibration_View
+          ) AS t
+          GROUP BY Follower_Aircraft_Type ORDER BY Follower_Aircraft_Type
+          " %>% sqlQuery(con(), .) %>% as.data.table()
+          
+          fluidPage(
+            pickerInput(
+              "ord_2_type",
+              "Select Aircraft Type",
+              choices = ord_2_type_choices$Follower_Aircraft_Type %>% as.character(),
+              choicesOpt = list(subtext = ord_2_type_choices$Flight_Num %>% paste("Flights:", .)),
+              multiple = T,
+              options = list(`actions-box` = T, `live-search` = T),
+              width = "200px"
+            ),
+            sliderInput(
+              "ord_2_wind",
+              "Filter by Observed Surface Headwind (kts)",
+              min = 0,
+              max = 1000,
+              step = 5,
+              value = c(1,100),
+              dragRange = T,
+              width = "450px"
+            ),
+            pickerInput(
+              "ord_2_flights",
+              "Filter by Flight",
+              choices = NULL,
+              multiple = T,
+              options = list(`actions-box` = T, `live-search` = T),
+              width = "200px"
+            ),
+            h5("Note: Aircraft types with more unique flights will take longer to run!"),
+            actionButton("ord_2_run", "Run Calibration"),
+            uiOutput("ord_output")
+          )
+          
         })
         
-        observeEvent(ord_callsigns(), {
+        observeEvent(input$ord_2_type, {
+          
+          ord_2_wind_choices <- sprintf(
+            " SELECT
+              	 FLOOR(MIN(Follower_Threshold_Surface_Headwind)) AS Min_Headwind,
+              	 CEILING(MAX(Follower_Threshold_Surface_Headwind)) AS Max_Headwind
+              FROM (
+              	SELECT * FROM vw_ORD_Calibration_View
+              	WHERE Follower_Aircraft_Type IN ('%s')
+              ) AS t
+            ",
+            paste(input$ord_2_type, collapse = "','")
+          ) %>% sqlQuery(con(), .) %>% as.data.table()
+          
+          updateSliderInput(
+            session,
+            "ord_2_wind",
+            min = ord_2_wind_choices$Min_Headwind,
+            max = ord_2_wind_choices$Max_Headwind,
+            value = c(ord_2_wind_choices$Min_Headwind, ord_2_wind_choices$Max_Headwind)
+          )
+          
+        })
+        
+        observeEvent(input$ord_2_wind, {
+          
+          ord_2_flights_choices <- sprintf(
+            " SELECT DISTINCT FP_Date, Follower_Callsign, MIN(Follower_Threshold_Surface_Headwind) AS Surface_Headwind FROM vw_ORD_Calibration_View
+              WHERE Follower_Aircraft_Type IN ('%s') AND Follower_Threshold_Surface_Headwind BETWEEN %i AND %i
+              GROUP BY FP_Date, Follower_Callsign ORDER BY FP_Date, Follower_Callsign
+            ",
+            paste(input$ord_2_type, collapse = "','"), input$ord_2_wind[1], input$ord_2_wind[2]
+          ) %>% sqlQuery(con(), .) %>% as.data.table() %>% .[order(as.Date(FP_Date, format="%d/%m/%y", origin="1970-01-01"), Follower_Callsign)]
+          
           updatePickerInput(
             session,
-            "iasprofile_callsigns",
-            choices = ord_callsigns()$Callsign %>% as.character()
+            "ord_2_flights",
+            choices = ord_2_flights_choices[,paste(FP_Date, Follower_Callsign)] %>% as.character(),
+            selected = ord_2_flights_choices[,paste(FP_Date, Follower_Callsign)] %>% as.character(),
+            choicesOpt = list(subtext = ord_2_flights_choices[,paste0("Surface Headwind: ", round(Surface_Headwind, 2), "kts")] %>% as.character())
+          )
+          
+        })
+        
+        onclick(
+          "ord_2_run",
+          ord_cali(
+            sprintf(
+              "SELECT * FROM vw_ORD_Calibration_View WHERE Follower_Aircraft_Type IN ('%s') AND FP_Date+' '+Follower_Callsign IN ('%s')",
+              paste(input$ord_2_type, collapse = "','"),
+              paste(input$ord_2_flights, collapse = "','")
+            ) %>%
+              sqlQuery(con(), .) %>% as.data.table()
+          )
+        )
+        
+        ord_cali_nls <- reactive({
+          d <- ord_cali()[Follower_Range_To_Threshold >= 0 & Follower_Range_To_Threshold <= 6 & !is.na(Mode_S_IAS)][order(Follower_Range_To_Threshold)]
+          y <- d$Mode_S_IAS
+          y2 <- d$Mode_S_IAS - d$Mode_S_GSPD
+          x <- d$Follower_Range_To_Threshold
+          if (min(x) < 1 & max(x) >= 4) {
+            m <- tryCatch(
+              nls(
+                y ~ airspeed_model_vector_break(x, a, a1, b, n1, n2),
+                start = list(a = 140, a1 = 140, b = 160, n1 = 3, n2 = 4),
+                control = nls.control(tol = 0.001, minFactor = 1/ 16384, warnOnly = T)
+              ),
+              error = function(e) NULL
+            )
+            if (is.null(m)) {
+              x <- x %>% .[. <= 2]
+              y <- y[1:length(x)]
+              m <- tryCatch(
+                nls(
+                  y ~ airspeed_model_vector_break_2(x, a, a1),
+                  start = list(a = 140, a1 = 140),
+                  control = nls.control(tol = 0.001, minFactor = 1/ 16384, warnOnly = T)
+                ),
+                error = function(e) NULL
+              )
+              if (is.null(m)) {
+                m <- tryCatch(
+                  nls(
+                    y ~ a,
+                    start = list(a = 140),
+                    control = nls.control(tol = 0.001, minFactor = 1/ 16384, warnOnly = T)
+                  ),
+                  error = function(e) NULL
+                )
+              }
+            }
+          }
+          return(list(d=d,x=x,y=y,y2=y2,m=m))
+        })
+
+        observeEvent(ord_cali(), {
+          if (nrow(ord_cali()) > 0) {
+            output$ord_output <- renderUI({
+              tagList(
+                plotlyOutput("ord_iasprofile"),
+                plotlyOutput("ord_a2"),
+                div(style = "height: 15px"),
+                verbatimTextOutput("ord_iasprofile_nls"),
+                hr(),
+                column(
+                  6,
+                  div(style = "margin-bottom: 15px; font-size: 15px;", "Unique Flight Pairs"),
+                  DT::dataTableOutput("ord_cali_flights")
+                ),
+                column(
+                  6,
+                  div(style = "margin-bottom: 15px; font-size: 15px;", "ORD Calibration View"),
+                  DT::dataTableOutput("ord_cali_table")
+                )
+              )
+            })
+          } else {
+            output$ord_output <- renderUI({})
+          }
+        })
+
+        output$ord_cali_flights <- DT::renderDataTable({
+          datatable(
+            unique(ord_cali()[,c("FP_Date",
+                                 "Leader_Callsign",
+                                 "Leader_Aircraft_Type",
+                                 "Leader_RECAT_Wake_Turbulence_Category",
+                                 "Follower_Callsign",
+                                 "Follower_Aircraft_Type",
+                                 "Follower_RECAT_Wake_Turbulence_Category")]),
+            rownames = F,
+            selection = "none",
+            options = list(
+              pageLength = 15,
+              lengthMenu = seq(5, 100, 5),
+              columnDefs = list(list(className = 'dt-center', targets = "_all")),
+              scrollX = T
+            )
           )
         })
-        
-        ord_cali <- reactive({
-          sprintf(
-            "%s WHERE FP_Date IN ('%s') AND Follower_Callsign IN ('%s')",
-            query_vw_ORD_Calibration_View,
-            paste(input$iasprofile_dates, collapse = "','"),
-            paste(input$iasprofile_callsigns, collapse = "','")
-          ) %>%
-            sqlQuery(con(), .) %>% as.data.table()
-        })
-        
-        output$ord_cali_table <-  DT::renderDataTable({
+
+        output$ord_cali_table <- DT::renderDataTable({
           datatable(
             ord_cali(),
             rownames = F,
@@ -598,76 +816,76 @@ function(input, output, session) {
             )
           )
         })
-        
-        ord_cali_nls <- reactive({
-          req(input$iasprofile_callsigns)
-          d <- ord_cali()[Follower_Range_To_Threshold >= 0 & Follower_Range_To_Threshold <= 6 & !is.na(Mode_S_IAS)][order(Follower_Range_To_Threshold)]
-          y <- d$Mode_S_IAS
-          x <- d$Follower_Range_To_Threshold
-          if (min(x) < 1 & max(x) >= 4) {
-            m <- tryCatch(
-              nls(
-                y ~ airspeed_model_vector_break(x, a, a1, b, n1, n2),
-                start = list(a = 140, a1 = 140, b = 160, n1 = 3, n2 = 4),
-                control = nls.control(tol = 0.001, minFactor = 1/ 16384, warnOnly = T) 
-              ),
-              error = function(e) NULL
-            )
-            if (is.null(m)) {
-              x <- x %>% .[. <= 2]
-              y <- y[1:length(x)]
-              m <- tryCatch(
-                nls(
-                  y ~ airspeed_model_vector_break_2(x, a, a1),
-                  start = list(a = 140, a1 = 140),
-                  control = nls.control(tol = 0.001, minFactor = 1/ 16384, warnOnly = T) 
-                ),
-                error = function(e) NULL
-              )
-              if (is.null(m)) {
-                m <- tryCatch(
-                  nls(
-                    y ~ a,
-                    start = list(a = 140),
-                    control = nls.control(tol = 0.001, minFactor = 1/ 16384, warnOnly = T) 
-                  ),
-                  error = function(e) NULL
-                )
-              }
-            }
-          }
-          return(list(d=d,x=x,y=y,m=m))
-        })
-        
+
         output$ord_iasprofile_nls <- renderText({
           paste0(
-            "Model Output Parameters\r\n",
-            paste0(names(ord_cali_nls()$m$m$getPars()), ": ", ord_cali_nls()$m$m$getPars(), collapse = "\r\n")
+            "Model Output Parameters\n",
+            paste0(names(ord_cali_nls()$m$m$getPars()), " = ", ord_cali_nls()$m$m$getPars(), collapse = "  ")
           )
         })
-        
+
         output$ord_iasprofile <- renderPlotly({
-          plot_ly() %>%
+          p <- plot_ly() %>%
+            # add_markers(
+            #   x = ord_cali_nls()$x,
+            #   y = ord_cali_nls()$y2,
+            #   name = "Observed GSPD",
+            #   marker = list(color = "rgb(138,138,141)"),
+            #   yaxis = "y2"
+            # ) %>%
+            add_lines(
+              x = ord_cali_nls()$x,
+              y = ord_cali_nls()$d$Follower_Threshold_Surface_Headwind %>% min(., na.rm=T),
+              name = "Surface Headwind",
+              line = list(color = "rgb(85,87,89)"),
+              yaxis = "y2"
+            ) %>%
             add_markers(
               x = ord_cali_nls()$x,
               y = ord_cali_nls()$y,
-              name = "Observed",
-              marker=list(color="rgb(85,87,89)")
+              name = "Observed IAS",
+              marker = list(color = "rgb(128,34,69)")
             ) %>%
             add_lines(
               x = ord_cali_nls()$x,
               y = ord_cali_nls()$m$m$fitted(),
-              name = "Fitted",
-              line=list(color="rgb(213,16,103)")
-            ) %>% layout(
-              xaxis = list(title="Follower Range to Threshold (NM)"),
-              yaxis = list(title="Mode S IAS (kts)"),
-              showlegend = F
+              name = "Fitted IAS",
+              line = list(color = "rgb(213,16,103)")
+            ) %>%
+            layout(
+              hovermode = "compare",
+              xaxis = list(title = "Follower Range to Threshold (NM)"),
+              yaxis = list(title = "Mode S IAS (kts)", overlaying = "y2"),
+              yaxis2 = list(title = "Mode S GSPD (kts)", side = "right")
             ) %>%
             config(
               displaylogo = F
             )
+          ggplotly(p, width = session$clientData$output_ord_iasprofile_width) # Width fix
         })
+        
+        # output$ord_a2 <- renderPlotly({
+        #   
+        #   d <- ord_cali()[Follower_Range_To_Threshold >= 0 & Follower_Range_To_Threshold <= 6 & !is.na(Mode_S_IAS)][order(Follower_Range_To_Threshold)]
+        #   d$landing_adjustment <- sapply(1:nrow(d), function(i) calc_landing_adjustment(ref_data[aircraft_type == d$Follower_Aircraft_Type[i]]$landing_stabilisation_speed_type, d$Follower_Threshold_Surface_Headwind[i]))
+        #   d$a2 <- ord_cali_nls()$m$getPars()$a - d$landing_adjustment
+        #   
+        #   p <- plot_ly() %>%
+        #     add_histogram(
+        #       x = d$a2
+        #     ) %>%
+        #     layout(
+        #       hovermode = "compare",
+        #       xaxis = list(title = "Follower Range to Threshold (NM)"),
+        #       yaxis = list(title = "Mode S IAS (kts)", overlaying = "y2"),
+        #       yaxis2 = list(title = "Mode S GSPD (kts)", side = "right")
+        #     ) %>%
+        #     config(
+        #       displaylogo = F
+        #     )
+        #   ggplotly(p, width = session$clientData$output_ord_iasprofile_width) # Width fix
+        #   
+        # })
         
       }
       

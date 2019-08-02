@@ -43,6 +43,20 @@ If you encounter any issues while using the visualiser or would like to contribu
 
 ## Version Notes
 
+31/07/2019
+
+* Reworked ORD Tab Input Logic + Bug Fixes
+* Added Groundspeed Data to IAS Profile
+
+30/07/2019
+
+* Added Flight Filter for ORD Calibration by AC Type
+* Added ORD Calibration Run Buttons
+
+29/07/2019
+
+* Added ORD Calibration by AC Type
+
 26/07/2019
 
 * Enabled ORD Calibration View NLS Model Plot
