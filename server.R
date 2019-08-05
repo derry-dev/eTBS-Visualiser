@@ -550,7 +550,9 @@ function(input, output, session) {
       # ORD Tab -----------------------------------------------------------------
       # ----------------------------------------------------------------------- #
         
-        ord_cali <- reactiveVal("SELECT TOP (0) * FROM vw_ORD_Calibration_View" %>% sqlQuery(con(), .) %>% as.data.table())
+        # ORD Calibration By Aircraft
+        
+        ord_cali_1 <- reactiveVal("SELECT TOP (0) * FROM vw_ORD_Calibration_View" %>% sqlQuery(con(), .) %>% as.data.table())
         
         output$ord_1 <- renderUI({
           
@@ -583,7 +585,7 @@ function(input, output, session) {
               width = "200px"
             ),
             actionButton("ord_1_run", "Run Calibration"),
-            uiOutput("ord_output")
+            uiOutput("ord_output_1")
           )
           
         })
@@ -607,7 +609,7 @@ function(input, output, session) {
         
         onclick(
           "ord_1_run",
-          ord_cali(
+          ord_cali_1(
             sprintf(
               "SELECT * FROM vw_ORD_Calibration_View WHERE FP_Date IN ('%s') AND Follower_Callsign IN ('%s')",
               paste(input$ord_1_date %>% as.Date() %>% format("%d/%m/%y") %>% as.character(), collapse = "','"),
@@ -615,6 +617,157 @@ function(input, output, session) {
             ) %>% sqlQuery(con(), .) %>% as.data.table()
           )
         )
+        
+        ord_cali_nls_1 <- reactive({
+          d <- ord_cali_1()[Follower_Range_To_Threshold >= 0 & Follower_Range_To_Threshold <= 6 & !is.na(Mode_S_IAS)][order(Follower_Range_To_Threshold)]
+          y <- d$Mode_S_IAS
+          y2 <- d$Mode_S_IAS - d$Mode_S_GSPD
+          x <- d$Follower_Range_To_Threshold
+          if (min(x) < 1 & max(x) >= 4) {
+            m <- tryCatch(
+              nls(
+                y ~ airspeed_model_vector_break(x, a, a1, b, n1, n2),
+                start = list(a = 140, a1 = 140, b = 160, n1 = 3, n2 = 4),
+                control = nls.control(tol = 0.001, minFactor = 1/ 16384, warnOnly = T)
+              ),
+              error = function(e) NULL
+            )
+            if (is.null(m)) {
+              x <- x %>% .[. <= 2]
+              y <- y[1:length(x)]
+              m <- tryCatch(
+                nls(
+                  y ~ airspeed_model_vector_break_2(x, a, a1),
+                  start = list(a = 140, a1 = 140),
+                  control = nls.control(tol = 0.001, minFactor = 1/ 16384, warnOnly = T)
+                ),
+                error = function(e) NULL
+              )
+              if (is.null(m)) {
+                m <- tryCatch(
+                  nls(
+                    y ~ a,
+                    start = list(a = 140),
+                    control = nls.control(tol = 0.001, minFactor = 1/ 16384, warnOnly = T)
+                  ),
+                  error = function(e) NULL
+                )
+              }
+            }
+          }
+          return(list(d=d,x=x,y=y,y2=y2,m=m))
+        })
+        
+        observeEvent(ord_cali_1(), {
+          if (nrow(ord_cali_1()) > 0) {
+            output$ord_output_1 <- renderUI({
+              tagList(
+                plotlyOutput("ord_iasprofile_1"),
+                # plotlyOutput("ord_a2"),
+                div(style = "height: 15px"),
+                verbatimTextOutput("ord_iasprofile_nls_1"),
+                hr(),
+                column(
+                  6,
+                  div(style = "margin-bottom: 15px; font-size: 15px;", "Unique Flight Pairs"),
+                  DT::dataTableOutput("ord_cali_flights_1")
+                ),
+                column(
+                  6,
+                  div(style = "margin-bottom: 15px; font-size: 15px;", "ORD Calibration View"),
+                  DT::dataTableOutput("ord_cali_table_1")
+                )
+              )
+            })
+          } else {
+            output$ord_output_1 <- renderUI({})
+          }
+        })
+        
+        output$ord_cali_flights_1 <- DT::renderDataTable({
+          datatable(
+            unique(ord_cali_1()[,c("FP_Date",
+                                   "Leader_Callsign",
+                                   "Leader_Aircraft_Type",
+                                   "Leader_RECAT_Wake_Turbulence_Category",
+                                   "Follower_Callsign",
+                                   "Follower_Aircraft_Type",
+                                   "Follower_RECAT_Wake_Turbulence_Category")]),
+            rownames = F,
+            selection = "none",
+            options = list(
+              pageLength = 15,
+              lengthMenu = seq(5, 100, 5),
+              columnDefs = list(list(className = 'dt-center', targets = "_all")),
+              scrollX = T
+            )
+          )
+        })
+        
+        output$ord_cali_table_1 <- DT::renderDataTable({
+          datatable(
+            ord_cali_1(),
+            rownames = F,
+            selection = "none",
+            options = list(
+              pageLength = 15,
+              lengthMenu = seq(5, 100, 5),
+              columnDefs = list(list(className = 'dt-center', targets = "_all")),
+              scrollX = T
+            )
+          )
+        })
+        
+        output$ord_iasprofile_nls_1 <- renderText({
+          paste0(
+            "Model Output Parameters\n",
+            paste0(names(ord_cali_nls_1()$m$m$getPars()), " = ", ord_cali_nls_1()$m$m$getPars(), collapse = "  ")
+          )
+        })
+        
+        output$ord_iasprofile_1 <- renderPlotly({
+          p <- plot_ly() %>%
+            # add_markers(
+            #   x = ord_cali_nls()$x,
+            #   y = ord_cali_nls()$y2,
+            #   name = "Observed GSPD",
+            #   marker = list(color = "rgb(138,138,141)"),
+            #   yaxis = "y2"
+            # ) %>%
+            add_lines(
+              x = ord_cali_nls_1()$x,
+              y = ord_cali_nls_1()$d$Follower_Threshold_Surface_Headwind %>% min(., na.rm=T),
+              name = "Surface Headwind",
+              line = list(color = "rgb(85,87,89)"),
+              yaxis = "y2"
+            ) %>%
+            add_markers(
+              x = ord_cali_nls_1()$x,
+              y = ord_cali_nls_1()$y,
+              name = "Observed IAS",
+              marker = list(color = "rgb(128,34,69)")
+            ) %>%
+            add_lines(
+              x = ord_cali_nls_1()$x,
+              y = ord_cali_nls_1()$m$m$fitted(),
+              name = "Fitted IAS",
+              line = list(color = "rgb(213,16,103)")
+            ) %>%
+            layout(
+              hovermode = "compare",
+              xaxis = list(title = "Follower Range to Threshold (NM)"),
+              yaxis = list(title = "Mode S IAS (kts)", overlaying = "y2"),
+              yaxis2 = list(title = "Mode S GSPD (kts)", side = "right")
+            ) %>%
+            config(
+              displaylogo = F
+            )
+          ggplotly(p, width = session$clientData$output_ord_iasprofile_1_width) # Width fix
+        })
+        
+        # ORD Calibration By Aircraft Type
+        
+        ord_cali_2 <- reactiveVal("SELECT TOP (0) * FROM vw_ORD_Calibration_View" %>% sqlQuery(con(), .) %>% as.data.table())
         
         output$ord_2 <- renderUI({
           
@@ -656,7 +809,7 @@ function(input, output, session) {
             ),
             h5("Note: Aircraft types with more unique flights will take longer to run!"),
             actionButton("ord_2_run", "Run Calibration"),
-            uiOutput("ord_output")
+            uiOutput("ord_output_2")
           )
           
         })
@@ -707,7 +860,7 @@ function(input, output, session) {
         
         onclick(
           "ord_2_run",
-          ord_cali(
+          ord_cali_2(
             sprintf(
               "SELECT * FROM vw_ORD_Calibration_View WHERE Follower_Aircraft_Type IN ('%s') AND FP_Date+' '+Follower_Callsign IN ('%s')",
               paste(input$ord_2_type, collapse = "','"),
@@ -717,8 +870,8 @@ function(input, output, session) {
           )
         )
         
-        ord_cali_nls <- reactive({
-          d <- ord_cali()[Follower_Range_To_Threshold >= 0 & Follower_Range_To_Threshold <= 6 & !is.na(Mode_S_IAS)][order(Follower_Range_To_Threshold)]
+        ord_cali_nls_2 <- reactive({
+          d <- ord_cali_2()[Follower_Range_To_Threshold >= 0 & Follower_Range_To_Threshold <= 6 & !is.na(Mode_S_IAS)][order(Follower_Range_To_Threshold)]
           y <- d$Mode_S_IAS
           y2 <- d$Mode_S_IAS - d$Mode_S_GSPD
           x <- d$Follower_Range_To_Threshold
@@ -757,35 +910,35 @@ function(input, output, session) {
           return(list(d=d,x=x,y=y,y2=y2,m=m))
         })
 
-        observeEvent(ord_cali(), {
-          if (nrow(ord_cali()) > 0) {
-            output$ord_output <- renderUI({
+        observeEvent(ord_cali_2(), {
+          if (nrow(ord_cali_2()) > 0) {
+            output$ord_output_2 <- renderUI({
               tagList(
-                plotlyOutput("ord_iasprofile"),
-                plotlyOutput("ord_a2"),
+                plotlyOutput("ord_iasprofile_2"),
+                # plotlyOutput("ord_a2"),
                 div(style = "height: 15px"),
-                verbatimTextOutput("ord_iasprofile_nls"),
+                verbatimTextOutput("ord_iasprofile_nls_2"),
                 hr(),
                 column(
                   6,
                   div(style = "margin-bottom: 15px; font-size: 15px;", "Unique Flight Pairs"),
-                  DT::dataTableOutput("ord_cali_flights")
+                  DT::dataTableOutput("ord_cali_flights_2")
                 ),
                 column(
                   6,
                   div(style = "margin-bottom: 15px; font-size: 15px;", "ORD Calibration View"),
-                  DT::dataTableOutput("ord_cali_table")
+                  DT::dataTableOutput("ord_cali_table_2")
                 )
               )
             })
           } else {
-            output$ord_output <- renderUI({})
+            output$ord_output_2 <- renderUI({})
           }
         })
 
-        output$ord_cali_flights <- DT::renderDataTable({
+        output$ord_cali_flights_2 <- DT::renderDataTable({
           datatable(
-            unique(ord_cali()[,c("FP_Date",
+            unique(ord_cali_2()[,c("FP_Date",
                                  "Leader_Callsign",
                                  "Leader_Aircraft_Type",
                                  "Leader_RECAT_Wake_Turbulence_Category",
@@ -803,9 +956,9 @@ function(input, output, session) {
           )
         })
 
-        output$ord_cali_table <- DT::renderDataTable({
+        output$ord_cali_table_2 <- DT::renderDataTable({
           datatable(
-            ord_cali(),
+            ord_cali_2(),
             rownames = F,
             selection = "none",
             options = list(
@@ -817,14 +970,14 @@ function(input, output, session) {
           )
         })
 
-        output$ord_iasprofile_nls <- renderText({
+        output$ord_iasprofile_nls_2 <- renderText({
           paste0(
             "Model Output Parameters\n",
-            paste0(names(ord_cali_nls()$m$m$getPars()), " = ", ord_cali_nls()$m$m$getPars(), collapse = "  ")
+            paste0(names(ord_cali_nls_2()$m$m$getPars()), " = ", ord_cali_nls_2()$m$m$getPars(), collapse = "  ")
           )
         })
 
-        output$ord_iasprofile <- renderPlotly({
+        output$ord_iasprofile_2 <- renderPlotly({
           p <- plot_ly() %>%
             # add_markers(
             #   x = ord_cali_nls()$x,
@@ -834,21 +987,21 @@ function(input, output, session) {
             #   yaxis = "y2"
             # ) %>%
             add_lines(
-              x = ord_cali_nls()$x,
-              y = ord_cali_nls()$d$Follower_Threshold_Surface_Headwind %>% min(., na.rm=T),
+              x = ord_cali_nls_2()$x,
+              y = ord_cali_nls_2()$d$Follower_Threshold_Surface_Headwind %>% min(., na.rm=T),
               name = "Surface Headwind",
               line = list(color = "rgb(85,87,89)"),
               yaxis = "y2"
             ) %>%
             add_markers(
-              x = ord_cali_nls()$x,
-              y = ord_cali_nls()$y,
+              x = ord_cali_nls_2()$x,
+              y = ord_cali_nls_2()$y,
               name = "Observed IAS",
               marker = list(color = "rgb(128,34,69)")
             ) %>%
             add_lines(
-              x = ord_cali_nls()$x,
-              y = ord_cali_nls()$m$m$fitted(),
+              x = ord_cali_nls_2()$x,
+              y = ord_cali_nls_2()$m$m$fitted(),
               name = "Fitted IAS",
               line = list(color = "rgb(213,16,103)")
             ) %>%
@@ -861,7 +1014,7 @@ function(input, output, session) {
             config(
               displaylogo = F
             )
-          ggplotly(p, width = session$clientData$output_ord_iasprofile_width) # Width fix
+          ggplotly(p, width = session$clientData$output_ord_iasprofile_2_width) # Width fix
         })
         
         # output$ord_a2 <- renderPlotly({

@@ -120,14 +120,21 @@ body_tab_plt <- tabItem(
 
 body_tab_ord <- tabItem(
   "tab_ord",
-  tabBox(
-    title = "Calibration",
-    side = "right",
+  box(
+    title = "ORD Calibration By Aircraft",
     width = NULL,
-    selected = "By Aircraft Type",
-    # tabPanel("By Wake (RECAT)", uiOutput("ord_3")),
-    tabPanel("By Aircraft Type", uiOutput("ord_2")),
-    tabPanel("By Aircraft", uiOutput("ord_1"))
+    solidHeader = T,
+    collapsible = T,
+    collapsed = T,
+    uiOutput("ord_1")
+  ),
+  box(
+    title = "ORD Calibration By Aircraft Type",
+    width = NULL,
+    solidHeader = T,
+    collapsible = T,
+    collapsed = T,
+    uiOutput("ord_2")
   )
 )
 
