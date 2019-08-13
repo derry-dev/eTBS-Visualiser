@@ -4,78 +4,68 @@
 
 rm(list = ls())
 
-# install.packages(
-#   c(
-#     "shiny", "shinyjs", "shinydashboard", "shinyWidgets", "RODBC", "data.table", "DT",
-#     "leaflet", "sp", "RColorBrewer", "mapview", "plyr", "dplyr", "plotly"
-#   ),
-#   repos = "https://cloud.r-project.org",
-#   dependencies = T
-# )
-# webshot::install_phantomjs()
-
-library(shiny)
-library(shinyjs)
-library(shinydashboard)
-library(shinyWidgets)
-library(RODBC)
-library(data.table)
-library(DT)
-library(leaflet)
-library(sp)
-library(RColorBrewer)
-library(mapview)
-library(plyr)
-library(dplyr)
-library(plotly)
+suppressPackageStartupMessages(library(shiny))
+suppressPackageStartupMessages(library(shinyjs))
+suppressPackageStartupMessages(library(shinydashboard))
+suppressPackageStartupMessages(library(shinyWidgets))
+suppressPackageStartupMessages(library(RODBC))
+suppressPackageStartupMessages(library(data.table))
+suppressPackageStartupMessages(library(DT))
+suppressPackageStartupMessages(library(leaflet))
+suppressPackageStartupMessages(library(sp))
+suppressPackageStartupMessages(library(RColorBrewer))
+suppressPackageStartupMessages(library(mapview))
+suppressPackageStartupMessages(library(plyr))
+suppressPackageStartupMessages(library(dplyr))
+suppressPackageStartupMessages(library(plotly))
 
 source("defaults.R", local = T)
 
-# ref_data <- fread(file.path(getwd(), "data", "01a ORD Configuration Output Type v1.3.csv"))
+ref_data <- fread(file.path(getwd(), "data", "01a ORD Configuration Output Type v1.3.csv"))
 
 # ----------------------------------------------------------------------- #
 # SQL Queries -------------------------------------------------------------
 # ----------------------------------------------------------------------- #
-
-query_vw_ORD_Calibration_View_Flights <- "
-  SELECT DISTINCT FP_Date
-      ,Leader_Callsign
-      ,Leader_Aircraft_Type
-      ,Leader_RECAT_Wake_Turbulence_Category
-      ,Follower_Callsign
-      ,Follower_Aircraft_Type
-      ,Follower_RECAT_Wake_Turbulence_Category
-      ,RECAT_Wake_Separation_Minimum
-      ,RECAT_ROT_Spacing_Minumum
-      ,Leader_4DME_Time
-      ,Follower_0DME_Time
-      ,Follower_0DME_RTT
-      ,Follower_Threshold_Surface_Headwind
-      ,Follower_Threshold_Surface_Wind_Speed
-      ,Follower_Threshold_Surface_Wind_Heading
-      ,Forecast_Follower_TBS_Wind_Effect
-      ,Delivered_4DME_Separation
-      ,Landing_Runway
-  FROM vw_ORD_Calibration_View
-"
-
-# eTBS Performance Model Data Output view
-query_vw_eTBS_Performance_Model <- "
-  SET DATEFORMAT dmy
-  SELECT * FROM vw_eTBS_Performance_Model
-  ORDER BY CAST(FP_Date AS datetime), Leader_4DME_Time
-"
-
-# All Pair Reference Data
-query_vw_All_Pair_Reference_Data <- "
-  SET DATEFORMAT dmy
-  SELECT * FROM vw_All_Pair_Reference_Data
-  ORDER BY CAST(FP_Date AS datetime), Leader_4DME_Time
-"
-query_vw_All_Pair_Radar_Track_Point <- "
-  SELECT * FROM vw_All_Pair_Radar_Track_Point
-"
-
+# 
+# query_vw_ORD_Calibration_View_Flights <- "
+#   SELECT DISTINCT FP_Date
+#       ,Leader_Callsign
+#       ,Leader_Aircraft_Type
+#       ,Leader_RECAT_Wake_Turbulence_Category
+#       ,Follower_Callsign
+#       ,Follower_Aircraft_Type
+#       ,Follower_RECAT_Wake_Turbulence_Category
+#       ,RECAT_Wake_Separation_Minimum
+#       ,RECAT_ROT_Spacing_Minumum
+#       ,Leader_4DME_Time
+#       ,Follower_0DME_Time
+#       ,Follower_0DME_RTT
+#       ,Follower_Threshold_Surface_Headwind
+#       ,Follower_Threshold_Surface_Wind_Speed
+#       ,Follower_Threshold_Surface_Wind_Heading
+#       ,Forecast_Follower_TBS_Wind_Effect
+#       ,Delivered_4DME_Separation
+#       ,Landing_Runway
+#   FROM vw_ORD_Calibration_View
+# "
+# 
+# # eTBS Performance Model Data Output view
+# query_vw_eTBS_Performance_Model <- "
+#   SET DATEFORMAT dmy
+#   SELECT * FROM vw_eTBS_Performance_Model
+#   ORDER BY CAST(FP_Date AS datetime), Leader_4DME_Time
+# "
+# 
+# # All Pair Reference Data
+# query_vw_All_Pair_Reference_Data <- "
+#   SET DATEFORMAT dmy
+#   SELECT * FROM vw_All_Pair_Reference_Data
+#   ORDER BY CAST(FP_Date AS datetime), Leader_4DME_Time
+# "
+# query_vw_All_Pair_Radar_Track_Point <- "
+#   SELECT * FROM vw_All_Pair_Radar_Track_Point
+# "
+# 
 # ----------------------------------------------------------------------- #
 # General Functions -------------------------------------------------------
 # ----------------------------------------------------------------------- #

@@ -373,7 +373,13 @@ summary {
 <div id="running-the-visualiser" class="section level3">
 <h3>Running the Visualiser</h3>
 <p>In order to use the eTBS visualiser on your local PC, you must first <a href="https://cloud.r-project.org/">install R</a>.</p>
-<p>Once R is installed, open the R console and run the command below to install the required R packages for the visualiser to function correctly:</p>
+<div id="option-1-batch-script" class="section level4">
+<h4>Option 1: Batch Script</h4>
+<p>In the eTBS visualiser folder, double click the run.bat file. This script will start the visualiser after locating the R executable and installing the missing packages required.</p>
+</div>
+<div id="option-2-r-console-session" class="section level4">
+<h4>Option 2: R console session</h4>
+<p>Open the R console and run the command below to install the required R packages for the visualiser to function correctly:</p>
 <pre class="r"><code>install.packages(
   c(
     &quot;shiny&quot;, &quot;shinyjs&quot;, &quot;shinydashboard&quot;, &quot;shinyWidgets&quot;, &quot;RODBC&quot;, &quot;data.table&quot;, &quot;DT&quot;,
@@ -383,16 +389,20 @@ summary {
   dependencies = T
 )
 webshot::install_phantomjs()</code></pre>
-<p>After the packages are installed, there are two ways to launch the visualiser:</p>
-<ol style="list-style-type: decimal">
-<li><p><a href="https://www.rstudio.com/products/rstudio/download/#download">Install RStudio</a>, open any of the files <strong>global.R</strong>, <strong>ui.R</strong> or <strong>server.R</strong> in RStudio, install the required R packages and click the run icon on the top right-hand side of the source window.</p></li>
-<li><p>In the R console, run the following commands:</p></li>
-</ol>
+<p>Then in the R console, run the following commands:</p>
 <pre class="r"><code># Replace the file path with the directory containing the eTBS Visualiser folder
 setwd(&quot;C:/Users/USER NAME/Documents/&quot;)
 
 shiny::runApp(&quot;eTBS Visualiser&quot;, launch.browser = TRUE)</code></pre>
-<p>It is recommended to use a modern web browser such as Google Chrome, Mozilla Firefox or Opera, you may encounter issues such as missing UI elements if you attempt to use the visualiser using older browsers such as Microsoft Edge or Internet Explorer.</p>
+</div>
+<div id="option-3-rstudio" class="section level4">
+<h4>Option 3: RStudio</h4>
+<p>Make sure <a href="https://www.rstudio.com/products/rstudio/download/#download">RStudio</a> is installed, then open any one of the files <strong>global.R</strong>, <strong>ui.R</strong> or <strong>server.R</strong>, install the required R packages listed in <strong>Option 2</strong> and click the run icon on the top right-hand side of the source window.</p>
+</div>
+<div id="notes" class="section level4">
+<h4>Notes</h4>
+<p>It is recommended to have an up-to-date web browser such as Google Chrome, Mozilla Firefox set as the default web browser on your system, full support of functionalities are not guaranteed on other browsers such as Opera, Apple Safari, Microsoft Edge, Internet Explorer and you may encounter issues such as missing UI elements if you attempt to use the visualiser.</p>
+</div>
 </div>
 <div id="editing-the-visualiser" class="section level3">
 <h3>Editing the Visualiser</h3>
@@ -402,6 +412,20 @@ shiny::runApp(&quot;eTBS Visualiser&quot;, launch.browser = TRUE)</code></pre>
 </div>
 <div id="version-notes" class="section level2">
 <h2>Version Notes</h2>
+<p>13/08/2019</p>
+<ul>
+<li>Fixed incorrect callsign for FP ID on PLT map</li>
+<li>Changed PLT map centering to use adaptation data table</li>
+</ul>
+<p>09/08/2019</p>
+<ul>
+<li>Added batch file for easy launching of visualiser</li>
+<li>Added animation to PLT map</li>
+</ul>
+<p>05/08/2019</p>
+<ul>
+<li>Fixed non-default starting ORD tabs not working correctly</li>
+</ul>
 <p>31/07/2019</p>
 <ul>
 <li>Reworked ORD Tab Input Logic + Bug Fixes</li>

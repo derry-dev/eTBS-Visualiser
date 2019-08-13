@@ -104,7 +104,19 @@ body_tab_plt <- tabItem(
   box(
     width = NULL,
     leafletOutput("pltmap"),
-    uiOutput("pltmap_filters_ui")
+    uiOutput("pltmap_filters_ui"),
+    hr(),
+    sliderInput(
+      "pltmap_time_range", 
+      "Choose Time Range:", 
+      min = NA,
+      max = NA, 
+      value = c(NA, NA),
+      step = 1,
+      round = T,
+      animate = animationOptions(interval = 100, loop = T),
+      dragRange = T
+    )
   ),
   tabBox(
     title = "Tables",

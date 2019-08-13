@@ -53,7 +53,6 @@ function(input, output, session) {
   # Render PLT map tiles
   output$pltmap <- renderLeaflet({
     leaflet(options = leafletOptions(zoomControl = F, preferCanvas = T)) %>%
-      setView(lng = -0.45, lat = 51.46, zoom = 10) %>%
       addProviderTiles(providers$Esri.WorldImagery, options=providerTileOptions(noWrap=TRUE), group="Satellite") %>%
       addProviderTiles(providers$CartoDB.Positron, options=providerTileOptions(noWrap=TRUE), group="Grey") %>%
       addProviderTiles(providers$CartoDB.DarkMatter, options=providerTileOptions(noWrap=TRUE), group="Dark") %>%
@@ -130,6 +129,19 @@ function(input, output, session) {
       # PLT Tab -----------------------------------------------------------------
       # ----------------------------------------------------------------------- #
         
+        # Map centering
+        map_centre <- reactive({
+          " SELECT 
+            	Grid_Projection_Origin_Lat/PI()*180 AS Lat,
+            	Grid_Projection_Origin_Lon/PI()*180 AS Lon
+            FROM tbl_Adaptation_Data
+          " %>% sqlQuery(con(),.) %>% as.data.table()
+        })
+        
+        observeEvent(map_centre(), {
+          leafletProxy("pltmap") %>% setView(lng = map_centre()$Lon, lat = map_centre()$Lat, zoom = 10)
+        })
+        
         # tbl_Flight_Plan
         flightplan <- reactive({
           " SELECT * FROM tbl_Flight_Plan
@@ -154,8 +166,30 @@ function(input, output, session) {
           " %>% sqlQuery(con(),.) %>% as.data.table()
         })
         
+        observeEvent(input$pltmap_fpid, {
+          time_range <- sprintf(
+            " SELECT MIN(Track_Time) AS Min_Time, MAX(Track_Time) AS Max_Time FROM tbl_Radar_Track_Point
+              LEFT JOIN (
+                SELECT Radar_Track_Point_ID AS Radar_Track_Point_ID_2, Corrected_Mode_C, Range_To_Threshold, Range_To_ILS, Path_Leg
+                FROM tbl_Radar_Track_Point_Derived
+              ) AS t ON Radar_Track_Point_ID = Radar_Track_Point_ID_2
+              WHERE Flight_Plan_ID IN ('%s')
+            ",
+            paste(input$pltmap_fpid, collapse = "','")
+          ) %>%
+            sqlQuery(con(),.) %>%
+            as.data.table()
+          updateSliderInput(
+            session,
+            "pltmap_time_range",
+            min = time_range$Min_Time,
+            max = time_range$Max_Time,
+            value = c(time_range$Min_Time, time_range$Min_Time + 60)
+          )
+        })
+        
         # Subsetted tbl_Radar_Track_Point
-        tracks <- eventReactive(input$pltmap_fpid, {
+        tracks_full <- eventReactive(input$pltmap_fpid, {
           sprintf(
             " SELECT * FROM tbl_Radar_Track_Point
               LEFT JOIN (
@@ -169,6 +203,11 @@ function(input, output, session) {
             sqlQuery(con(),.) %>%
             as.data.table()  %>%
             .[is.na(Path_Leg), Path_Leg := "NA"]
+        })
+        
+        # Subsetted tbl_Radar_Track_Point
+        tracks <- reactive({
+          tracks_full()[Track_Time >= input$pltmap_time_range[1] & Track_Time <= input$pltmap_time_range[2]]
         })
         
         # PLT Map Top Left Dropdown & Screenshot Buttons
@@ -246,12 +285,12 @@ function(input, output, session) {
         
         # Update FPID Filter Choices
         observeEvent(input$pltmap_fpdate, {
-          pltmap_fpid_choices <- flightplan()[FP_Date %in% input$pltmap_fpdate]$Flight_Plan_ID %>% as.character() %>% unique() %>% sort()
+          pltmap_fpid_choices <- flightplan()[FP_Date %in% input$pltmap_fpdate, c("Flight_Plan_ID", "Callsign")][order(Flight_Plan_ID)] %>% unique()
           updatePickerInput(
             session,
             "pltmap_fpid",
-            choices = pltmap_fpid_choices,
-            choicesOpt = list(subtext = flightplan()[Flight_Plan_ID %in% pltmap_fpid_choices]$Callsign %>% as.character())
+            choices = pltmap_fpid_choices$Flight_Plan_ID %>% as.character(),
+            choicesOpt = list(subtext = pltmap_fpid_choices$Callsign %>% as.character())
           )
         })
         
@@ -663,7 +702,6 @@ function(input, output, session) {
             output$ord_output_1 <- renderUI({
               tagList(
                 plotlyOutput("ord_iasprofile_1"),
-                # plotlyOutput("ord_a2"),
                 div(style = "height: 15px"),
                 verbatimTextOutput("ord_iasprofile_nls_1"),
                 hr(),
@@ -727,13 +765,13 @@ function(input, output, session) {
         
         output$ord_iasprofile_1 <- renderPlotly({
           p <- plot_ly() %>%
-            # add_markers(
-            #   x = ord_cali_nls()$x,
-            #   y = ord_cali_nls()$y2,
-            #   name = "Observed GSPD",
-            #   marker = list(color = "rgb(138,138,141)"),
-            #   yaxis = "y2"
-            # ) %>%
+            add_markers(
+              x = ord_cali_nls_1()$x,
+              y = ord_cali_nls_1()$y2,
+              name = "Observed GSPD",
+              marker = list(color = "rgb(138,138,141)"),
+              yaxis = "y2"
+            ) %>%
             add_lines(
               x = ord_cali_nls_1()$x,
               y = ord_cali_nls_1()$d$Follower_Threshold_Surface_Headwind %>% min(., na.rm=T),
@@ -915,9 +953,10 @@ function(input, output, session) {
             output$ord_output_2 <- renderUI({
               tagList(
                 plotlyOutput("ord_iasprofile_2"),
-                # plotlyOutput("ord_a2"),
                 div(style = "height: 15px"),
                 verbatimTextOutput("ord_iasprofile_nls_2"),
+                div(style = "height: 15px"),
+                plotlyOutput("ord_a2"),
                 hr(),
                 column(
                   6,
@@ -979,20 +1018,6 @@ function(input, output, session) {
 
         output$ord_iasprofile_2 <- renderPlotly({
           p <- plot_ly() %>%
-            # add_markers(
-            #   x = ord_cali_nls()$x,
-            #   y = ord_cali_nls()$y2,
-            #   name = "Observed GSPD",
-            #   marker = list(color = "rgb(138,138,141)"),
-            #   yaxis = "y2"
-            # ) %>%
-            add_lines(
-              x = ord_cali_nls_2()$x,
-              y = ord_cali_nls_2()$d$Follower_Threshold_Surface_Headwind %>% min(., na.rm=T),
-              name = "Surface Headwind",
-              line = list(color = "rgb(85,87,89)"),
-              yaxis = "y2"
-            ) %>%
             add_markers(
               x = ord_cali_nls_2()$x,
               y = ord_cali_nls_2()$y,
@@ -1008,8 +1033,7 @@ function(input, output, session) {
             layout(
               hovermode = "compare",
               xaxis = list(title = "Follower Range to Threshold (NM)"),
-              yaxis = list(title = "Mode S IAS (kts)", overlaying = "y2"),
-              yaxis2 = list(title = "Mode S GSPD (kts)", side = "right")
+              yaxis = list(title = "Mode S IAS (kts)")
             ) %>%
             config(
               displaylogo = F
@@ -1017,28 +1041,28 @@ function(input, output, session) {
           ggplotly(p, width = session$clientData$output_ord_iasprofile_2_width) # Width fix
         })
         
-        # output$ord_a2 <- renderPlotly({
-        #   
-        #   d <- ord_cali()[Follower_Range_To_Threshold >= 0 & Follower_Range_To_Threshold <= 6 & !is.na(Mode_S_IAS)][order(Follower_Range_To_Threshold)]
-        #   d$landing_adjustment <- sapply(1:nrow(d), function(i) calc_landing_adjustment(ref_data[aircraft_type == d$Follower_Aircraft_Type[i]]$landing_stabilisation_speed_type, d$Follower_Threshold_Surface_Headwind[i]))
-        #   d$a2 <- ord_cali_nls()$m$getPars()$a - d$landing_adjustment
-        #   
-        #   p <- plot_ly() %>%
-        #     add_histogram(
-        #       x = d$a2
-        #     ) %>%
-        #     layout(
-        #       hovermode = "compare",
-        #       xaxis = list(title = "Follower Range to Threshold (NM)"),
-        #       yaxis = list(title = "Mode S IAS (kts)", overlaying = "y2"),
-        #       yaxis2 = list(title = "Mode S GSPD (kts)", side = "right")
-        #     ) %>%
-        #     config(
-        #       displaylogo = F
-        #     )
-        #   ggplotly(p, width = session$clientData$output_ord_iasprofile_width) # Width fix
-        #   
-        # })
+        output$ord_a2 <- renderPlotly({
+
+          d <- ord_cali_2()[Follower_Range_To_Threshold >= 0 & Follower_Range_To_Threshold <= 6 & !is.na(Mode_S_IAS)][order(Follower_Range_To_Threshold)]
+          d$landing_adjustment <- sapply(1:nrow(d), function(i) calc_landing_adjustment(ref_data[aircraft_type == d$Follower_Aircraft_Type[i]]$landing_stabilisation_speed_type, d$Follower_Threshold_Surface_Headwind[i]))
+          d$a2 <- ord_cali_nls_2()$m$m$getPars()[["a"]] - d$landing_adjustment
+          
+          p <- plot_ly() %>%
+            add_histogram(
+              x = d$a2,
+              histfunc = "count",
+              histnorm = "probability"
+            ) %>%
+            layout(
+              hovermode = "compare",
+              xaxis = list(title = "a2")
+            ) %>%
+            config(
+              displaylogo = F
+            )
+          ggplotly(p, width = session$clientData$output_ord_iasprofile_width) # Width fix
+
+        })
         
       }
       

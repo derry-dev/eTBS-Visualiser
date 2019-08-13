@@ -6,7 +6,13 @@
 
 In order to use the eTBS visualiser on your local PC, you must first [install R](https://cloud.r-project.org/).
 
-Once R is installed, open the R console and run the command below to install the required R packages for the visualiser to function correctly:
+#### Option 1: Batch Script
+
+In the eTBS visualiser folder, double click the run.bat file. This script will start the visualiser after locating the R executable and installing the missing packages required.
+
+#### Option 2: R console session
+
+Open the R console and run the command below to install the required R packages for the visualiser to function correctly:
 
 ```r
 install.packages(
@@ -19,12 +25,7 @@ install.packages(
 )
 webshot::install_phantomjs()
 ```
-
-After the packages are installed, there are two ways to launch the visualiser:
-
-1. [Install RStudio](https://www.rstudio.com/products/rstudio/download/#download), open any of the files **global.R**, **ui.R** or **server.R** in RStudio, install the required R packages and click the run icon on the top right-hand side of the source window.
-
-2. In the R console, run the following commands:
+Then in the R console, run the following commands:
 
 ```r
 # Replace the file path with the directory containing the eTBS Visualiser folder
@@ -33,7 +34,13 @@ setwd("C:/Users/USER NAME/Documents/")
 shiny::runApp("eTBS Visualiser", launch.browser = TRUE)
 ```
 
-It is recommended to use a modern web browser such as Google Chrome, Mozilla Firefox or Opera, you may encounter issues such as missing UI elements if you attempt to use the visualiser using older browsers such as Microsoft Edge or Internet Explorer.
+#### Option 3: RStudio
+
+Make sure [RStudio](https://www.rstudio.com/products/rstudio/download/#download) is installed, then open any one of the files **global.R**, **ui.R** or **server.R**, install the required R packages listed in **Option 2** and click the run icon on the top right-hand side of the source window.
+
+#### Notes
+
+It is recommended to have an up-to-date web browser such as Google Chrome, Mozilla Firefox set as the default web browser on your system, full support of functionalities are not guaranteed on other browsers such as Opera, Apple Safari, Microsoft Edge, Internet Explorer and you may encounter issues such as missing UI elements if you attempt to use the visualiser.
 
 ### Editing the Visualiser
 
@@ -42,6 +49,20 @@ If you encounter any issues while using the visualiser or would like to contribu
 ---
 
 ## Version Notes
+
+13/08/2019
+
+* Fixed incorrect callsign for FP ID on PLT map
+* Changed PLT map centering to use adaptation data table
+
+09/08/2019
+
+* Added batch file for easy launching of visualiser
+* Added animation to PLT map
+
+05/08/2019
+
+* Fixed non-default starting ORD tabs not working correctly
 
 31/07/2019
 
