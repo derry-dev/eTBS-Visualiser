@@ -368,17 +368,17 @@ summary {
 
 <div id="etbs-visualiser" class="section level1">
 <h1>eTBS Visualiser</h1>
-<div id="user-guide" class="section level2">
-<h2>User Guide</h2>
-<div id="running-the-visualiser" class="section level3">
-<h3>Running the Visualiser</h3>
+<p>The eTBS Visualiser is a locally packaged web application written in R using the Shiny package. The application developed to connect to the eTBS database as a user-friendly interface for eTBS project development activities including but not limited to: Path Leg Tracking, ORD Calibration and ORD Validation. The application also provides a rudimentary SQL querying tool.</p>
+<hr />
+<div id="getting-started" class="section level2">
+<h2>Getting Started</h2>
 <p>In order to use the eTBS visualiser on your local PC, you must first <a href="https://cloud.r-project.org/">install R</a>.</p>
-<div id="option-1-batch-script" class="section level4">
-<h4>Option 1: Batch Script</h4>
+<div id="option-1-windows-only-batch-script" class="section level5">
+<h5>Option 1 (Windows Only): Batch Script</h5>
 <p>In the eTBS visualiser folder, double click the run.bat file. This script will start the visualiser after locating the R executable and installing the missing packages required.</p>
 </div>
-<div id="option-2-r-console-session" class="section level4">
-<h4>Option 2: R console session</h4>
+<div id="option-3-r-console-session" class="section level5">
+<h5>Option 3: R console session</h5>
 <p>Open the R console and run the command below to install the required R packages for the visualiser to function correctly:</p>
 <pre class="r"><code>install.packages(
   c(
@@ -395,18 +395,13 @@ setwd(&quot;C:/Users/USER NAME/Documents/&quot;)
 
 shiny::runApp(&quot;eTBS Visualiser&quot;, launch.browser = TRUE)</code></pre>
 </div>
-<div id="option-3-rstudio" class="section level4">
-<h4>Option 3: RStudio</h4>
+<div id="option-4-rstudio" class="section level5">
+<h5>Option 4: RStudio</h5>
 <p>Make sure <a href="https://www.rstudio.com/products/rstudio/download/#download">RStudio</a> is installed, then open any one of the files <strong>global.R</strong>, <strong>ui.R</strong> or <strong>server.R</strong>, install the required R packages listed in <strong>Option 2</strong> and click the run icon on the top right-hand side of the source window.</p>
 </div>
-<div id="notes" class="section level4">
-<h4>Notes</h4>
+<div id="notes" class="section level5">
+<h5>Notes</h5>
 <p>It is recommended to have an up-to-date web browser such as Google Chrome, Mozilla Firefox set as the default web browser on your system, full support of functionalities are not guaranteed on other browsers such as Opera, Apple Safari, Microsoft Edge, Internet Explorer and you may encounter issues such as missing UI elements if you attempt to use the visualiser.</p>
-</div>
-</div>
-<div id="editing-the-visualiser" class="section level3">
-<h3>Editing the Visualiser</h3>
-<p>If you encounter any issues while using the visualiser or would like to contribute to the addition of new features, RStudio is recommended for development of the visualiser. Please see the developer if you require a version controlled copy of the visualiser project and create a pull request if you wish to merge your commits with the master branch.</p>
 <hr />
 </div>
 </div>
@@ -498,6 +493,16 @@ shiny::runApp(&quot;eTBS Visualiser&quot;, launch.browser = TRUE)</code></pre>
 <li>Added leaflet map to PLT analysis</li>
 <li>Set up initial dashboard template</li>
 </ul>
+<hr />
+</div>
+<div id="contribution" class="section level2">
+<h2>Contribution</h2>
+<p>If you encounter any issues while using the visualiser or would like to contribute to the addition of new features, RStudio is recommended for development of the visualiser. Please see the developer if you require a version controlled copy of the visualiser project and create a pull request if you wish to merge your commits with the master branch.</p>
+<hr />
+</div>
+<div id="license" class="section level2">
+<h2>License</h2>
+<p>This software is licensed under the GNU General Public License - see the LICENSE.txt file for details.</p>
 </div>
 </div>
 

@@ -1,16 +1,22 @@
 # eTBS Visualiser
 
-## User Guide
+The eTBS Visualiser is a locally packaged web application written in R using the
+Shiny package. The application developed to connect to the eTBS database as a
+user-friendly interface for eTBS project development activities including but 
+not limited to: Path Leg Tracking, ORD Calibration and ORD Validation. The
+application also provides a rudimentary SQL querying tool.
 
-### Running the Visualiser
+---
+
+## Getting Started
 
 In order to use the eTBS visualiser on your local PC, you must first [install R](https://cloud.r-project.org/).
 
-#### Option 1: Batch Script
+##### Option 1 (Windows Only): Batch Script
 
 In the eTBS visualiser folder, double click the run.bat file. This script will start the visualiser after locating the R executable and installing the missing packages required.
 
-#### Option 2: R console session
+##### Option 3: R console session
 
 Open the R console and run the command below to install the required R packages for the visualiser to function correctly:
 
@@ -34,17 +40,13 @@ setwd("C:/Users/USER NAME/Documents/")
 shiny::runApp("eTBS Visualiser", launch.browser = TRUE)
 ```
 
-#### Option 3: RStudio
+##### Option 4: RStudio
 
 Make sure [RStudio](https://www.rstudio.com/products/rstudio/download/#download) is installed, then open any one of the files **global.R**, **ui.R** or **server.R**, install the required R packages listed in **Option 2** and click the run icon on the top right-hand side of the source window.
 
-#### Notes
+##### Notes
 
 It is recommended to have an up-to-date web browser such as Google Chrome, Mozilla Firefox set as the default web browser on your system, full support of functionalities are not guaranteed on other browsers such as Opera, Apple Safari, Microsoft Edge, Internet Explorer and you may encounter issues such as missing UI elements if you attempt to use the visualiser.
-
-### Editing the Visualiser
-
-If you encounter any issues while using the visualiser or would like to contribute to the addition of new features, RStudio is recommended for development of the visualiser. Please see the developer if you require a version controlled copy of the visualiser project and create a pull request if you wish to merge your commits with the master branch.
 
 ---
 
@@ -135,3 +137,15 @@ If you encounter any issues while using the visualiser or would like to contribu
 
 * Added leaflet map to PLT analysis
 * Set up initial dashboard template
+
+---
+
+## Contribution
+
+If you encounter any issues while using the visualiser or would like to contribute to the addition of new features, RStudio is recommended for development of the visualiser. Please see the developer if you require a version controlled copy of the visualiser project and create a pull request if you wish to merge your commits with the master branch.
+
+---
+
+## License
+
+This software is licensed under the GNU General Public License - see the LICENSE.txt file for details.

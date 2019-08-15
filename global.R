@@ -21,7 +21,7 @@ suppressPackageStartupMessages(library(plotly))
 
 source("defaults.R", local = T)
 
-ref_data <- fread(file.path(getwd(), "data", "01a ORD Configuration Output Type v1.3.csv"))
+ref_data <- fread(file.path(getwd(), "data", "01a ORD Configuration Output Type v1.6.csv"))
 
 # ----------------------------------------------------------------------- #
 # SQL Queries -------------------------------------------------------------
@@ -127,16 +127,16 @@ debug_dialogue <- function() {
 # ORD Calibration Functions -----------------------------------------------
 # ----------------------------------------------------------------------- #
 
-calc_landing_adjustment <-function(landing_type, headwind){
+calc_landing_adjustment <- function(landing_type, headwind){
   return(
-    if (landing_type %in% c(0)) {
+    if (landing_type %in% c(0, 10, 11, 12)) {
       sapply(headwind / 2, function(hw_adj) ifelse(hw_adj < 5, 5, ifelse(hw_adj > 20, 20, hw_adj)))
     } else if (landing_type %in% c(1, 2, 3, 4, 5)) {
       sapply(headwind / 3, function(hw_adj) ifelse(hw_adj < 5, 5, ifelse(hw_adj > 15, 15, hw_adj)))
-    } else if (landing_type %in% c(6, 8)) {
+    } else if (landing_type %in% c(6)) {
       sapply(headwind / 2, function(hw_adj) ifelse(hw_adj < 0, 0, ifelse(hw_adj > 20, 20, hw_adj)))
-    } else if (landing_type %in% c(7)) {
-      sapply(headwind / 2, function(hw_adj) ifelse(hw_adj < 10, 10, ifelse(hw_adj > 20, 20, hw_adj)))
+    } else if (landing_type %in% c(7, 8)) {
+      sapply(headwind, function(hw_adj) 0)
     } else if (landing_type %in% c(9)) {
       sapply(headwind, function(hw_adj) ifelse(hw_adj > 20, 15, ifelse(hw_adj > 10, 10, 5)))
     }

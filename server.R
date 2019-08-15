@@ -184,7 +184,7 @@ function(input, output, session) {
             "pltmap_time_range",
             min = time_range$Min_Time,
             max = time_range$Max_Time,
-            value = c(time_range$Min_Time, time_range$Min_Time + 60)
+            value = c(time_range$Min_Time, time_range$Max_Time)
           )
         })
         
