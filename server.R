@@ -36,7 +36,7 @@ function(input, output, session) {
   
   # Database connection
   con <- eventReactive(input$db_connect, {
-    valueExpr = get_db_connection(input$db_driver, input$db_server, input$db_database, input$db_username, input$db_password)
+    get_db_connection(input$db_driver, input$db_server, input$db_database, input$db_username, input$db_password)
   })
   
   # Database connection status feedback
@@ -596,22 +596,18 @@ function(input, output, session) {
         output$ord_1 <- renderUI({
           
           ord_1_date_choices <- "
-          SELECT DISTINCT Convert(date, FP_Date, 3) FROM vw_ORD_Calibration_View
+            SET DATEFORMAT dmy
+            SELECT DISTINCT CAST(FP_Date AS date) AS FP_Date FROM vw_ORD_Calibration_View
+            ORDER BY CAST(FP_Date AS date)
           " %>% sqlQuery(con(), .) %>% unlist() %>% as.vector()
           
           fluidPage(
-            airDatepickerInput(
+            pickerInput(
               "ord_1_date",
               "Select Date",
+              choices = ord_1_date_choices,
               multiple = T,
-              separator = ", ",
-              dateFormat = "dd/mm/yyyy",
-              minDate = min(ord_1_date_choices),
-              maxDate = max(ord_1_date_choices),
-              disabledDates = seq(as.Date(min(ord_1_date_choices)), as.Date(max(ord_1_date_choices)), by=1) %>% .[as.character(.) %!in% ord_1_date_choices],
-              view = "months",
-              clearButton = T,
-              addon = "none",
+              options = list(`actions-box` = T, `live-search` = T),
               width = "200px"
             ),
             div(style = "width: 15px"),
@@ -623,6 +619,12 @@ function(input, output, session) {
               options = list(`actions-box` = T, `live-search` = T),
               width = "200px"
             ),
+            radioGroupButtons(
+              "ord_1_speedtype",
+              "Select Speed Type",
+              choices = c("IAS", "GSPD")
+            ),
+            uiOutput("ord_1_alt_ui"),
             actionButton("ord_1_run", "Run Calibration"),
             uiOutput("ord_output_1")
           )
@@ -632,9 +634,11 @@ function(input, output, session) {
         observeEvent(input$ord_1_date, {
           
           ord_1_callsign_choices <- sprintf(
-            " SELECT DISTINCT FP_Date, Follower_Callsign, Follower_Aircraft_Type FROM vw_ORD_Calibration_View WHERE FP_Date IN ('%s')
+            " SET DATEFORMAT dmy
+              SELECT DISTINCT CAST(FP_Date AS date) AS FP_Date, Follower_Callsign, Follower_Aircraft_Type
+              FROM vw_ORD_Calibration_View WHERE CAST(FP_Date AS date) IN ('%s')
             ",
-            paste(input$ord_1_date %>% as.Date() %>% format("%d/%m/%y") %>% as.character(), collapse = "','")
+            paste(input$ord_1_date %>% as.Date() %>% as.character(), collapse = "','")
           ) %>% sqlQuery(con(), .) %>% as.data.table()
           
           updatePickerInput(
@@ -646,12 +650,22 @@ function(input, output, session) {
           
         })
         
+        observeEvent(input$ord_1_speedtype, {
+          if (input$ord_1_speedtype == "GSPD") {
+            output$ord_1_alt_ui <- renderUI({
+              numericInput("ord_1_alt", "Airport Altitude Above Sea Level (ft)", value = 550, step = 10, width = "200px")
+            })
+          }
+        })
+        
         onclick(
           "ord_1_run",
           ord_cali_1(
             sprintf(
-              "SELECT * FROM vw_ORD_Calibration_View WHERE FP_Date IN ('%s') AND Follower_Callsign IN ('%s')",
-              paste(input$ord_1_date %>% as.Date() %>% format("%d/%m/%y") %>% as.character(), collapse = "','"),
+              " SET DATEFORMAT dmy
+                SELECT * FROM vw_ORD_Calibration_View
+                WHERE CAST(FP_Date AS date) IN ('%s') AND Follower_Callsign IN ('%s')",
+              paste(input$ord_1_date %>% as.Date() %>% as.character(), collapse = "','"),
               paste(input$ord_1_callsign, collapse = "','")
             ) %>% sqlQuery(con(), .) %>% as.data.table()
           )
@@ -659,8 +673,11 @@ function(input, output, session) {
         
         ord_cali_nls_1 <- reactive({
           d <- ord_cali_1()[Follower_Range_To_Threshold >= 0 & Follower_Range_To_Threshold <= 6 & !is.na(Mode_S_IAS)][order(Follower_Range_To_Threshold)]
-          y <- d$Mode_S_IAS
-          y2 <- d$Mode_S_IAS - d$Mode_S_GSPD
+          y <- if (input$ord_1_speedtype == "IAS") {
+            d$Mode_S_IAS
+          } else if (input$ord_1_speedtype == "GSPD") {
+            d$Track_Speed/(1+input$ord_1_alt/60000)
+          }
           x <- d$Follower_Range_To_Threshold
           if (min(x) < 1 & max(x) >= 4) {
             m <- tryCatch(
@@ -694,7 +711,7 @@ function(input, output, session) {
               }
             }
           }
-          return(list(d=d,x=x,y=y,y2=y2,m=m))
+          return(list(d=d,x=x,y=y,m=m))
         })
         
         observeEvent(ord_cali_1(), {
@@ -765,37 +782,28 @@ function(input, output, session) {
         
         output$ord_iasprofile_1 <- renderPlotly({
           p <- plot_ly() %>%
-            add_markers(
-              x = ord_cali_nls_1()$x,
-              y = ord_cali_nls_1()$y2,
-              name = "Observed GSPD",
-              marker = list(color = "rgb(138,138,141)"),
-              yaxis = "y2"
-            ) %>%
-            add_lines(
-              x = ord_cali_nls_1()$x,
-              y = ord_cali_nls_1()$d$Follower_Threshold_Surface_Headwind %>% min(., na.rm=T),
-              name = "Surface Headwind",
-              line = list(color = "rgb(85,87,89)"),
-              yaxis = "y2"
-            ) %>%
+            # add_lines(
+            #   x = ord_cali_nls_1()$x,
+            #   y = ord_cali_nls_1()$d$Follower_Threshold_Surface_Headwind %>% min(., na.rm=T),
+            #   name = "Surface Headwind",
+            #   line = list(color = "rgb(85,87,89)")
+            # ) %>%
             add_markers(
               x = ord_cali_nls_1()$x,
               y = ord_cali_nls_1()$y,
-              name = "Observed IAS",
+              name = "Observed Speed",
               marker = list(color = "rgb(128,34,69)")
             ) %>%
             add_lines(
               x = ord_cali_nls_1()$x,
               y = ord_cali_nls_1()$m$m$fitted(),
-              name = "Fitted IAS",
+              name = "Fitted Speed",
               line = list(color = "rgb(213,16,103)")
             ) %>%
             layout(
               hovermode = "compare",
               xaxis = list(title = "Follower Range to Threshold (NM)"),
-              yaxis = list(title = "Mode S IAS (kts)", overlaying = "y2"),
-              yaxis2 = list(title = "Mode S GSPD (kts)", side = "right")
+              yaxis = list(title = "Speed (kts)")
             ) %>%
             config(
               displaylogo = F
@@ -832,7 +840,7 @@ function(input, output, session) {
               "Filter by Observed Surface Headwind (kts)",
               min = 0,
               max = 1000,
-              step = 5,
+              step = 1,
               value = c(1,100),
               dragRange = T,
               width = "450px"
@@ -911,7 +919,6 @@ function(input, output, session) {
         ord_cali_nls_2 <- reactive({
           d <- ord_cali_2()[Follower_Range_To_Threshold >= 0 & Follower_Range_To_Threshold <= 6 & !is.na(Mode_S_IAS)][order(Follower_Range_To_Threshold)]
           y <- d$Mode_S_IAS
-          y2 <- d$Mode_S_IAS - d$Mode_S_GSPD
           x <- d$Follower_Range_To_Threshold
           if (min(x) < 1 & max(x) >= 4) {
             m <- tryCatch(
@@ -945,7 +952,7 @@ function(input, output, session) {
               }
             }
           }
-          return(list(d=d,x=x,y=y,y2=y2,m=m))
+          return(list(d=d,x=x,y=y,m=m))
         })
 
         observeEvent(ord_cali_2(), {
@@ -1021,19 +1028,19 @@ function(input, output, session) {
             add_markers(
               x = ord_cali_nls_2()$x,
               y = ord_cali_nls_2()$y,
-              name = "Observed IAS",
+              name = "Observed Speed",
               marker = list(color = "rgb(128,34,69)")
             ) %>%
             add_lines(
               x = ord_cali_nls_2()$x,
               y = ord_cali_nls_2()$m$m$fitted(),
-              name = "Fitted IAS",
+              name = "Fitted Speed",
               line = list(color = "rgb(213,16,103)")
             ) %>%
             layout(
               hovermode = "compare",
               xaxis = list(title = "Follower Range to Threshold (NM)"),
-              yaxis = list(title = "Mode S IAS (kts)")
+              yaxis = list(title = "Speed (kts)")
             ) %>%
             config(
               displaylogo = F
@@ -1044,7 +1051,7 @@ function(input, output, session) {
         output$ord_a2 <- renderPlotly({
 
           d <- ord_cali_2()[Follower_Range_To_Threshold >= 0 & Follower_Range_To_Threshold <= 6 & !is.na(Mode_S_IAS)][order(Follower_Range_To_Threshold)]
-          d$landing_adjustment <- sapply(1:nrow(d), function(i) calc_landing_adjustment(ref_data[aircraft_type == d$Follower_Aircraft_Type[i]]$landing_stabilisation_speed_type, d$Follower_Threshold_Surface_Headwind[i]))
+          d$landing_adjustment <- sapply(1:nrow(d), function(i) calc_landing_adjustment(lss_types[[d$Follower_Aircraft_Type[i]]], d$Follower_Threshold_Surface_Headwind[i]))
           d$a2 <- ord_cali_nls_2()$m$m$getPars()[["a"]] - d$landing_adjustment
           
           p <- plot_ly() %>%

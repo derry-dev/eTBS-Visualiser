@@ -21,51 +21,8 @@ suppressPackageStartupMessages(library(plotly))
 
 source("defaults.R", local = T)
 
-ref_data <- fread(file.path(getwd(), "data", "01a ORD Configuration Output Type v1.6.csv"))
+lss_types <- fread(file.path("data", "ORD Configuration.csv"))
 
-# ----------------------------------------------------------------------- #
-# SQL Queries -------------------------------------------------------------
-# ----------------------------------------------------------------------- #
-# 
-# query_vw_ORD_Calibration_View_Flights <- "
-#   SELECT DISTINCT FP_Date
-#       ,Leader_Callsign
-#       ,Leader_Aircraft_Type
-#       ,Leader_RECAT_Wake_Turbulence_Category
-#       ,Follower_Callsign
-#       ,Follower_Aircraft_Type
-#       ,Follower_RECAT_Wake_Turbulence_Category
-#       ,RECAT_Wake_Separation_Minimum
-#       ,RECAT_ROT_Spacing_Minumum
-#       ,Leader_4DME_Time
-#       ,Follower_0DME_Time
-#       ,Follower_0DME_RTT
-#       ,Follower_Threshold_Surface_Headwind
-#       ,Follower_Threshold_Surface_Wind_Speed
-#       ,Follower_Threshold_Surface_Wind_Heading
-#       ,Forecast_Follower_TBS_Wind_Effect
-#       ,Delivered_4DME_Separation
-#       ,Landing_Runway
-#   FROM vw_ORD_Calibration_View
-# "
-# 
-# # eTBS Performance Model Data Output view
-# query_vw_eTBS_Performance_Model <- "
-#   SET DATEFORMAT dmy
-#   SELECT * FROM vw_eTBS_Performance_Model
-#   ORDER BY CAST(FP_Date AS datetime), Leader_4DME_Time
-# "
-# 
-# # All Pair Reference Data
-# query_vw_All_Pair_Reference_Data <- "
-#   SET DATEFORMAT dmy
-#   SELECT * FROM vw_All_Pair_Reference_Data
-#   ORDER BY CAST(FP_Date AS datetime), Leader_4DME_Time
-# "
-# query_vw_All_Pair_Radar_Track_Point <- "
-#   SELECT * FROM vw_All_Pair_Radar_Track_Point
-# "
-# 
 # ----------------------------------------------------------------------- #
 # General Functions -------------------------------------------------------
 # ----------------------------------------------------------------------- #
@@ -82,9 +39,9 @@ connection_dialogue <- function() {
       class = "centered",
       h4("Connect to Database")
     ),
-    textInput("db_driver", "Driver Name", db_defaults$driver, width="100%"),
-    textInput("db_server", "Server Name", db_defaults$server, width="100%"),
-    textInput("db_database", "Database Name", db_defaults$database, width="100%"),
+    selectizeInput("db_driver", "Driver Name", c(db_defaults$driver, ""), options = list(create = T), width="100%"),
+    selectizeInput("db_server", "Server Name", c(db_defaults$server, ""), options = list(create = T), width="100%"),
+    selectizeInput("db_database", "Database Name", c("", db_defaults$database), options = list(create = T), width="100%"),
     textInput("db_username", "Username", db_defaults$username, width="100%"),
     passwordInput("db_password", "Password", db_defaults$password, width="100%"),
     div(
@@ -127,7 +84,7 @@ debug_dialogue <- function() {
 # ORD Calibration Functions -----------------------------------------------
 # ----------------------------------------------------------------------- #
 
-calc_landing_adjustment <- function(landing_type, headwind){
+calc_landing_adjustment <- function(landing_type, headwind) {
   return(
     if (landing_type %in% c(0, 10, 11, 12)) {
       sapply(headwind / 2, function(hw_adj) ifelse(hw_adj < 5, 5, ifelse(hw_adj > 20, 20, hw_adj)))
@@ -135,7 +92,9 @@ calc_landing_adjustment <- function(landing_type, headwind){
       sapply(headwind / 3, function(hw_adj) ifelse(hw_adj < 5, 5, ifelse(hw_adj > 15, 15, hw_adj)))
     } else if (landing_type %in% c(6)) {
       sapply(headwind / 2, function(hw_adj) ifelse(hw_adj < 0, 0, ifelse(hw_adj > 20, 20, hw_adj)))
-    } else if (landing_type %in% c(7, 8)) {
+    } else if (landing_type %in% c(7)) {
+      sapply(headwind, function(hw_adj) 10)
+    } else if (landing_type %in% c(8)) {
       sapply(headwind, function(hw_adj) 0)
     } else if (landing_type %in% c(9)) {
       sapply(headwind, function(hw_adj) ifelse(hw_adj > 20, 15, ifelse(hw_adj > 10, 10, 5)))

@@ -1,0 +1,99 @@
+eTBS Visualiser
+---------------
+
+README
+------
+
+The eTBS Visualiser is a locally packaged web application written in R using
+the Shiny package. The application developed to connect to the eTBS database as
+a user-friendly interface for eTBS project development activities including but 
+not limited to: Path Leg Tracking, ORD Calibration and ORD Validation. The
+application also provides a rudimentary SQL querying tool.
+
+CHANGE HISTORY
+--------------
+
+22/08/2019 (v3.4)
+	Fixed ORD Calibration By Aircraft Type headwind filter step
+	Fixed ORD Calibration By Aircraft date filter NavCan compatibility
+	Added dropdown selection for database connection dialogue
+	LSS data once again separated into CSV file
+16/08/2019 (v3.3)
+	Incorporated LSS data into defaults.R
+	Added local R installation
+15/08/2019 (v3.2)
+	Application packaged as Windows setup
+	Added local chrome executable
+13/08/2019 (v3.1.1)
+	Fixed incorrect callsign for FP ID on PLT map
+	Changed PLT map centering to use adaptation data table
+09/08/2019 (v3.1)
+	Added batch file for easy launching of visualiser
+	Added animation to PLT map
+05/08/2019 (v3.0.1)
+	Fixed non-default starting ORD tabs not working correctly
+31/07/2019 (v3.0)
+	Reworked ORD Tab Input Logic + Bug Fixes
+	Added Groundspeed Data to IAS Profile
+30/07/2019 (v2.6)
+	Added Flight Filter for ORD Calibration by AC Type
+	Added ORD Calibration Run Buttons
+29/07/2019 (v2.5)
+	Added ORD Calibration by AC Type
+26/07/2019 (v2.4)
+	Enabled ORD Calibration View NLS Model Plot
+	Added simplified models on NLS model failure
+	Server.R commenting
+	Minor layout fixes
+18/07/2019 (v2.3.1)
+	Fixed PLT screenshot not working
+	Fixed PLT screenshot map tile issue
+	Fixed PLT screenshot location/zoom issue
+	Added PLT map leg legend
+16/07/2019 (v2.3)
+	Added PLT marker & polygon customisation
+	Restored additional PLT map tiles
+	Known issue: PLT screenshot tool not working
+10/07/2019 (v2.2)
+	Added ORD Calibration View NLS modelling
+	PLT Map and General Bug Fixes
+	New loading animation
+09/07/2019 (v2.1)
+	Added ORD functions
+	Fixed volumes not displaying in PLT map
+	Enabled PLT map track filtering by path leg
+	Enabled real-time updating of PLT map based on selection
+	Changed default PLT map tile to CartoDB.DarkMatter
+	Fixed PLT map markers/volumes not appearing in screenshot
+25/06/2019 (v2.0)
+	Complete Rework
+	Data is no longer saved locally (queried directly from database)
+	Added Database Dashboard with Query Tool
+	Adapted PLT Map to new eTBS data
+	Improved CSS
+14/02/2019 (v1.2)
+	Incorporated database import script into dashboard
+13/02/2019 (v1.1)
+	Imported database files to local csv
+	Added working map for PLT analysis track plotting
+	Corrected map and dashboard layout problems
+12/02/2019 (v1.0)
+	Added leaflet map to PLT analysis
+	Set up initial dashboard template
+
+BUG REPORT
+----------
+
+If you encounter any issues while using the visualiser or would like to
+contribute to the addition of new features, RStudio is recommended for
+development of the visualiser. Please see the developer if you require a
+version controlled copy of the visualiser project to create a pull request.
+
+LICENSE
+-------
+
+eTBS Visualiser is a free software distributed under the GNU LGPL - read
+LICENSE.txt file for more details.
+
+----------
+Derry Leng
