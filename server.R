@@ -625,6 +625,7 @@ function(input, output, session) {
               choices = c("IAS", "GSPD")
             ),
             uiOutput("ord_1_alt_ui"),
+            materialSwitch("ord_1_ma", "Moving Average", status = "danger"),
             actionButton("ord_1_run", "Run Calibration"),
             uiOutput("ord_output_1")
           )
@@ -673,12 +674,24 @@ function(input, output, session) {
         
         ord_cali_nls_1 <- reactive({
           d <- ord_cali_1()[Follower_Range_To_Threshold >= 0 & Follower_Range_To_Threshold <= 6 & !is.na(Mode_S_IAS)][order(Follower_Range_To_Threshold)]
-          y <- if (input$ord_1_speedtype == "IAS") {
-            d$Mode_S_IAS
+          if (input$ord_1_speedtype == "IAS") {
+            x <- d$Follower_Range_To_Threshold
+            y <- d$Mode_S_IAS
           } else if (input$ord_1_speedtype == "GSPD") {
-            d$Track_Speed/(1+input$ord_1_alt/60000)
+            speed_calc <- data.table(
+              Time_Diff = diff(d$Track_Time),
+              X_Diff = diff(d$X_Position),
+              Y_Diff = diff(d$Y_Position)
+            )
+            speed_calc <- speed_calc[Time_Diff != 0]
+            speed_calc$Speed <- sqrt(d$X_Diff^2+d$Y_Diff^2)/d$Time_Diff
+            x <- d$Follower_Range_To_Threshold[-1]
+            y <- speed_calc$Speed/(1+input$ord_1_alt/60000)
           }
-          x <- d$Follower_Range_To_Threshold
+          if (input$ord_1_ma == T) {
+            x <- ma(x)
+            y <- ma(y)
+          }
           if (min(x) < 1 & max(x) >= 4) {
             m <- tryCatch(
               nls(
@@ -853,6 +866,13 @@ function(input, output, session) {
               options = list(`actions-box` = T, `live-search` = T),
               width = "200px"
             ),
+            radioGroupButtons(
+              "ord_2_speedtype",
+              "Select Speed Type",
+              choices = c("IAS", "GSPD")
+            ),
+            uiOutput("ord_2_alt_ui"),
+            materialSwitch("ord_2_ma", "Moving Average", status = "danger"),
             h5("Note: Aircraft types with more unique flights will take longer to run!"),
             actionButton("ord_2_run", "Run Calibration"),
             uiOutput("ord_output_2")
@@ -904,6 +924,14 @@ function(input, output, session) {
           
         })
         
+        observeEvent(input$ord_2_speedtype, {
+          if (input$ord_2_speedtype == "GSPD") {
+            output$ord_2_alt_ui <- renderUI({
+              numericInput("ord_2_alt", "Airport Altitude Above Sea Level (ft)", value = 550, step = 10, width = "200px")
+            })
+          }
+        })
+        
         onclick(
           "ord_2_run",
           ord_cali_2(
@@ -918,8 +946,24 @@ function(input, output, session) {
         
         ord_cali_nls_2 <- reactive({
           d <- ord_cali_2()[Follower_Range_To_Threshold >= 0 & Follower_Range_To_Threshold <= 6 & !is.na(Mode_S_IAS)][order(Follower_Range_To_Threshold)]
-          y <- d$Mode_S_IAS
-          x <- d$Follower_Range_To_Threshold
+          if (input$ord_2_speedtype == "IAS") {
+            x <- d$Follower_Range_To_Threshold
+            y <- d$Mode_S_IAS
+          } else if (input$ord_2_speedtype == "GSPD") {
+            speed_calc <- data.table(
+              Time_Diff = diff(d$Track_Time),
+              X_Diff = diff(d$X_Position),
+              Y_Diff = diff(d$Y_Position)
+            )
+            speed_calc <- speed_calc[Time_Diff != 0]
+            speed_calc$Speed <- sqrt(d$X_Diff^2+d$Y_Diff^2)/d$Time_Diff
+            x <- d$Follower_Range_To_Threshold[-1]
+            y <- speed_calc$Speed/(1+input$ord_2_alt/60000)
+          }
+          if (input$ord_2_ma == T) {
+            x <- ma(x)
+            y <- ma(y)
+          }
           if (min(x) < 1 & max(x) >= 4) {
             m <- tryCatch(
               nls(

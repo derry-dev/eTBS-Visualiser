@@ -137,3 +137,13 @@ airspeed_model_break_2 <- function(x, a, a1) {
 airspeed_model_vector_break_2 <- function(x, a, a1) {
   sapply(x, airspeed_model_break_2, a = a, a1 = a1, simplify = T)
 }
+
+ma <- function(v, forward = 1, backward = 1) {
+  if (length(v) >= forward+backward+1) {
+    return(sapply((1+backward):(length(v)-forward), function(i) {
+      return(sum(v[(i-backward):(i+forward)])/(forward+backward+1))
+    }))
+  } else {
+    return(v)
+  }
+}
