@@ -22,6 +22,7 @@ sidebar_tab_db <- menuItem(
 sidebar_tab_plt <- menuItem(
   text = "Path Leg Tracking",
   tabName = "tab_plt",
+  selected = T,
   icon = icon("map-marker-alt")
 )
 
@@ -36,7 +37,7 @@ sidebar_tab_ord <- menuItem(
 # ----------------------------------------------------------------------- #
 
 sidebar <- dashboardSidebar(
-  collapsed	= F,
+  collapsed	= T,
   width = 250,
   sidebarMenu(
     id = "tabs",
@@ -67,35 +68,39 @@ www <- tagList(
 
 body_tab_db <- tabItem(
   "tab_db",
-  tabBox(
+  box(
     title = "Database Explorer",
+    width = NULL,
+    box(
+      solidHeader = T,
+      collapsible  = F,
+      width = NULL,
+      textAreaInput(
+        "db_query",
+        NULL,
+        placeholder = "Enter your query here...",
+        width = "100%",
+        height = "246px",
+        resize = "vertical"
+      ),
+      div(
+        class = "centered",
+        actionButton("db_execute", "Execute", icon("play")),
+        div(style = "margin: 0 5px 0 5px"),
+        actionButton("db_clear", "Clear", icon("eraser"))
+      ),
+      DT::dataTableOutput("db_output")
+    )
+  ),
+  tabBox(
+    title = "Adaptation Data",
     side = "right",
     width = NULL,
-    selected = "Query Tool",
-    tabPanel("Table List", DT::dataTableOutput("db_databases")),
-    tabPanel(
-      "Query Tool",
-      box(
-        solidHeader = T,
-        collapsible  = F,
-        width = NULL,
-        textAreaInput(
-          "db_query",
-          NULL,
-          placeholder = "Enter your query here...",
-          width = "100%",
-          height = "246px",
-          resize = "vertical"
-        ),
-        div(
-          class = "centered",
-          actionButton("db_execute", "Execute", icon("play")),
-          div(style = "margin: 0 5px 0 5px"),
-          actionButton("db_clear", "Clear", icon("eraser"))
-        ),
-        DT::dataTableOutput("db_output")
-      )
-    )
+    selected = "Aircraft",
+    tabPanel("Wake", DT::dataTableOutput("db_wake_adaptation_table")),
+    tabPanel("Runway", DT::dataTableOutput("db_runway_adaptation_table")),
+    tabPanel("DBS", DT::dataTableOutput("db_dbs_adaptation_table")),
+    tabPanel("Aircraft", DT::dataTableOutput("db_aircraft_adaptation_table"))
   )
 )
 
@@ -133,20 +138,12 @@ body_tab_plt <- tabItem(
 body_tab_ord <- tabItem(
   "tab_ord",
   box(
-    title = "ORD Calibration By Aircraft",
+    title = "ORD Calibration Viewer",
     width = NULL,
-    solidHeader = T,
-    collapsible = T,
-    collapsed = T,
-    uiOutput("ord_1")
-  ),
-  box(
-    title = "ORD Calibration By Aircraft Type",
-    width = NULL,
-    solidHeader = T,
-    collapsible = T,
-    collapsed = T,
-    uiOutput("ord_2")
+    uiOutput("tab_ord_ui_1"),
+    uiOutput("tab_ord_ui_2"),
+    uiOutput("tab_ord_ui_3"),
+    uiOutput("tab_ord_ui_4")
   )
 )
 
