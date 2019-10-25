@@ -6,7 +6,7 @@ function(input, output, session) {
   # Debug session data display
   onclick("think_logo", showModal(debug_dialogue()))
   output$clientdataText <- renderText({
-    cnames <- names(cdata) %>% .[. %!in% grep("^output_spinner.*$", ., value=T)]
+    cnames <- sort(names(cdata)) %>% .[. %!in% grep("^output_spinner.*$", ., value=T)]
     allvalues <- lapply(cnames, function(name) {
       paste(name, cdata[[name]], sep = " = ")
     })
@@ -48,19 +48,6 @@ function(input, output, session) {
         div(style="margin: 7px 0 0 6px;", "Error", icon("times-circle"))
       }
     })
-  })
-  
-  # Render PLT map tiles
-  output$pltmap <- renderLeaflet({
-    leaflet(options = leafletOptions(zoomControl = F, preferCanvas = T)) %>%
-      addProviderTiles(providers$Esri.WorldImagery, options=providerTileOptions(noWrap=TRUE), group="Satellite") %>%
-      addProviderTiles(providers$CartoDB.Positron, options=providerTileOptions(noWrap=TRUE), group="Grey") %>%
-      addProviderTiles(providers$CartoDB.DarkMatter, options=providerTileOptions(noWrap=TRUE), group="Dark") %>%
-      addProviderTiles(providers$Esri.WorldTopoMap, options=providerTileOptions(noWrap=TRUE), group="Light") %>%
-      addProviderTiles(providers$Esri.DeLorme, options=providerTileOptions(noWrap=TRUE), group="Topo") %>%
-      addProviderTiles(providers$OpenStreetMap.Mapnik, options=providerTileOptions(noWrap=TRUE), group="OSM") %>%
-      addProviderTiles(providers$OpenStreetMap.BlackAndWhite, options=providerTileOptions(noWrap=TRUE), group="OSM B&W") %>%
-      addLayersControl(baseGroups=c("Satellite","Grey","Dark","Light","Topo","OSM","OSM B&W"), options=layersControlOptions(collapsed=T))
   })
   
   # ----------------------------------------------------------------------- #
@@ -173,6 +160,20 @@ function(input, output, session) {
   # ----------------------------------------------------------------------- #
   # PLT Tab -----------------------------------------------------------------
   # ----------------------------------------------------------------------- #
+  
+  # Render PLT map tiles
+  output$pltmap <- renderLeaflet({
+    leaflet(options = leafletOptions(zoomControl = F, preferCanvas = T)) %>%
+      setView(lng = 0, lat = 0, zoom = 3) %>%
+      addProviderTiles(providers$Esri.WorldImagery, options=providerTileOptions(noWrap=TRUE), group="Satellite") %>%
+      addProviderTiles(providers$CartoDB.Positron, options=providerTileOptions(noWrap=TRUE), group="Grey") %>%
+      addProviderTiles(providers$CartoDB.DarkMatter, options=providerTileOptions(noWrap=TRUE), group="Dark") %>%
+      addProviderTiles(providers$Esri.WorldTopoMap, options=providerTileOptions(noWrap=TRUE), group="Light") %>%
+      addProviderTiles(providers$Esri.DeLorme, options=providerTileOptions(noWrap=TRUE), group="Topo") %>%
+      addProviderTiles(providers$OpenStreetMap.Mapnik, options=providerTileOptions(noWrap=TRUE), group="OSM") %>%
+      addProviderTiles(providers$OpenStreetMap.BlackAndWhite, options=providerTileOptions(noWrap=TRUE), group="OSM B&W") %>%
+      addLayersControl(baseGroups=c("Satellite","Grey","Dark","Light","Topo","OSM","OSM B&W"), options=layersControlOptions(collapsed=T))
+  })
   
   # Map centering
   map_centre <- reactive({
