@@ -163,16 +163,26 @@ function(input, output, session) {
   
   # Render PLT map tiles
   output$pltmap <- renderLeaflet({
-    leaflet(options = leafletOptions(zoomControl = F, preferCanvas = T)) %>%
-      setView(lng = 0, lat = 0, zoom = 3) %>%
-      addProviderTiles(providers$Esri.WorldImagery, options=providerTileOptions(noWrap=TRUE), group="Satellite") %>%
-      addProviderTiles(providers$CartoDB.Positron, options=providerTileOptions(noWrap=TRUE), group="Grey") %>%
-      addProviderTiles(providers$CartoDB.DarkMatter, options=providerTileOptions(noWrap=TRUE), group="Dark") %>%
-      addProviderTiles(providers$Esri.WorldTopoMap, options=providerTileOptions(noWrap=TRUE), group="Light") %>%
-      addProviderTiles(providers$Esri.DeLorme, options=providerTileOptions(noWrap=TRUE), group="Topo") %>%
-      addProviderTiles(providers$OpenStreetMap.Mapnik, options=providerTileOptions(noWrap=TRUE), group="OSM") %>%
-      addProviderTiles(providers$OpenStreetMap.BlackAndWhite, options=providerTileOptions(noWrap=TRUE), group="OSM B&W") %>%
-      addLayersControl(baseGroups=c("Satellite","Grey","Dark","Light","Topo","OSM","OSM B&W"), options=layersControlOptions(collapsed=T))
+    x <- leaflet(options = leafletOptions(zoomControl = F, preferCanvas = T)) %>%
+      setView(lng = 0, lat = 0, zoom = 3)
+    tile_providers <- list(
+      `Esri Satellite` = "Esri.WorldImagery",
+      `Esri Terrain` = "Esri.WorldTerrain",
+      `Esri Relief` = "Esri.WorldShadedRelief",
+      `Esri Physical` = "Esri.WorldPhysical",
+      `Esri Ocean` = "Esri.OceanBasemap",
+      `Esri Nat Geo` = "Esri.NatGeoWorldMap",
+      `CartoDB Light` = "CartoDB.Positron",
+      `CartoDB Light 2` = "CartoDB.PositronNoLabels",
+      `CartoDB Dark` = "CartoDB.DarkMatter",
+      `CartoDB Dark 2` = "CartoDB.DarkMatterNoLabels",
+      `OSM Mapnik` = "OpenStreetMap.Mapnik",
+      `OSM B&W` = "OpenStreetMap.BlackAndWhite"
+    )
+    for (i in 1:length(tile_providers)) {
+      x <- x %>% addProviderTiles(providers[[tile_providers[[i]]]], options = providerTileOptions(noWrap = T), group = names(tile_providers)[i])
+    }
+    x <- x %>% addLayersControl(baseGroups = names(tile_providers), options = layersControlOptions(collapsed = T))
   })
   
   # Map centering
@@ -629,9 +639,9 @@ function(input, output, session) {
       )
     )
   })
-  
+
   # ----------------------------------------------------------------------- #
-  # ORD Tab -----------------------------------------------------------------
+  # ORD Calibration Viewer --------------------------------------------------
   # ----------------------------------------------------------------------- #
   
   ord_dates <- eventReactive(con(), {
@@ -657,6 +667,7 @@ function(input, output, session) {
     box(
       title = "1. Search for Flights",
       width = NULL,
+      solidHeader = T,
       div(
         style = "display: flex; justify-content: space-around; flex-wrap: wrap;",
         pickerInput("ord_date", "Date in:", ord_dates(), multiple=T, options = list(`actions-box` = T, `live-search` = T), width="220px"),
@@ -699,6 +710,7 @@ function(input, output, session) {
       box(
         title = "2. Filter Flights",
         width = NULL,
+        solidHeader = T,
         div(
           style = "display: flex; justify-content: space-around; flex-wrap: wrap;",
           pickerInput(
@@ -787,6 +799,7 @@ function(input, output, session) {
       box(
         title = "3. Calibration Settings",
         width = NULL,
+        solidHeader = T,
         DT::dataTableOutput("ord_queried_output"),
         div(style = "height: 5px"),
         div(
@@ -827,6 +840,7 @@ function(input, output, session) {
       box(
         title = "4. Calibration Output",
         width = NULL,
+        solidHeader = T,
         plotlyOutput("ord_speedprofile_plot"),
         div(style = "height: 5px;"),
         verbatimTextOutput("ord_nls_print")
@@ -837,12 +851,37 @@ function(input, output, session) {
   
   ord_nls <- eventReactive(input$ord_run, {
     
-    x <- ord_filtered()[["Follower_Range_To_Threshold"]]
+    if (nrow(ord_filtered()) == 0) return(list(x = NA, y = NA, m = NA))
     
-    y <- if (input$ord_speedtype == "Derived GSPD") {
-      (ord_filtered()[["Track_Speed"]] + ord_filtered()[["Follower_Threshold_Surface_Headwind"]]) / (1+550/60000)
+    if (input$ord_speedtype == "Derived GSPD") {
+      
+      # Calculate speed based on positional difference between timestamps
+      tracks_new <- ord_filtered()[,c("Track_Time", "Follower_Threshold_Surface_Headwind", "Follower_Range_To_Threshold", "X_Position", "Y_Position", "Altitude", "Track_Speed")]
+      tracks_new$Distance_Travelled <- NA
+      for (k in 2:nrow(tracks_new)) {
+        tracks_new$Distance_Travelled[k] <- sqrt((tracks_new$X_Position[k] - tracks_new$X_Position[k-1])^2 + (tracks_new$Y_Position[k] - tracks_new$Y_Position[k-1])^2 + ((tracks_new$Altitude[k] - tracks_new$Altitude[k-1])/6076.12)^2)
+        if (k == 2) {
+          tracks_new$Distance_Travelled[k-1] <- tracks_new$Distance_Travelled[k]
+        }
+      }
+      tracks_new$Point_Speed <- NA
+      tracks_new$Point_Speed[1] <- tracks_new$Track_Speed[1]
+      for (k in 2:nrow(tracks_new)) {
+        tracks_new$Point_Speed[k] <- tracks_new$Distance_Travelled[k]/((tracks_new$Track_Time[k]-tracks_new$Track_Time[k-1])/3600)
+      }
+      
+      # Filter strange speeds (20% above or below Track_Speed range)
+      tracks_new <- tracks_new[Point_Speed >= max(min(tracks_new$Track_Speed, na.rm=T)*0.8, 50, na.rm=T) & Point_Speed <= max(tracks_new$Track_Speed, na.rm=T)*1.2]
+      
+      # Get tracks x and y vectors
+      x <- tracks_new$Follower_Range_To_Threshold
+      y <- (tracks_new$Point_Speed+tracks_new$Follower_Threshold_Surface_Headwind)/(1+550/60000)
+      
     } else {
-      ord_filtered()[[gsub(" ", "_", input$ord_speedtype)]]
+      
+      x <- ord_filtered()[["Follower_Range_To_Threshold"]]
+      y <- ord_filtered()[[gsub(" ", "_", input$ord_speedtype)]]
+      
     }
     
     if (length(x) < length(y)) {
@@ -923,5 +962,45 @@ function(input, output, session) {
     })
     
   })
+  
+  # ----------------------------------------------------------------------- #
+  # Landing Pair Viewer -----------------------------------------------------
+  # ----------------------------------------------------------------------- #
+  
+  # db_lp_ids <- reactive({
+  #   " SELECT DISTINCT Landing_Pair_ID
+  #     FROM vw_All_Pair_Reference_Data
+  #     ORDER BY Landing_Pair_ID
+  #   " %>% sqlQuery(con(),.) %>% unlist() %>% as.vector()
+  # })
+  # 
+  # output$tab_ord_ui_a <- renderUI({
+  #   box(
+  #     width = NULL,
+  #     solidHeader = T,
+  #     div(
+  #       style = "display: flex; justify-content: space-around; flex-wrap: wrap;",
+  #       textAreaInput(
+  #         "lp_select",
+  #         NULL,
+  #         placeholder = "Landing Pair ID",
+  #         width = "100%",
+  #         height = "38px",
+  #         resize = "none"
+  #       )
+  #     ),
+  #     div(
+  #       style = "text-align: center",
+  #       actionButton("lp_search", "Search")
+  #     )
+  #   )
+  # })
+  # 
+  # db_lp_lead_tracks <- eventReactive(input$lp_search, {
+  #   " SELECT DISTINCT Landing_Pair_ID
+  #     FROM vw_All_Pair_Reference_Data
+  #     ORDER BY Landing_Pair_ID
+  #   " %>% sqlQuery(con(),.) %>% unlist() %>% as.vector()
+  # })
   
 }

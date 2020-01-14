@@ -140,10 +140,20 @@ body_tab_ord <- tabItem(
   box(
     title = "ORD Calibration Viewer",
     width = NULL,
+    collapsible = T,
+    collapsed = T,
     uiOutput("tab_ord_ui_1"),
     uiOutput("tab_ord_ui_2"),
     uiOutput("tab_ord_ui_3"),
     uiOutput("tab_ord_ui_4")
+  ),
+  box(
+    title = "Landing Pair Viewer",
+    width = NULL,
+    collapsible = T,
+    collapsed = T,
+    uiOutput("tab_ord_ui_a"),
+    uiOutput("tab_ord_ui_b")
   )
 )
 

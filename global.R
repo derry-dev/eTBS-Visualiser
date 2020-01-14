@@ -51,7 +51,7 @@ connection_dialogue <- function() {
     ),
     size = "s",
     footer = NULL,
-    easyClose = F
+    easyClose = T
   )
 }
 
