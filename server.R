@@ -167,17 +167,11 @@ function(input, output, session) {
       setView(lng = 0, lat = 0, zoom = 3)
     tile_providers <- list(
       `Esri Satellite` = "Esri.WorldImagery",
-      `Esri Terrain` = "Esri.WorldTerrain",
-      `Esri Relief` = "Esri.WorldShadedRelief",
-      `Esri Physical` = "Esri.WorldPhysical",
-      `Esri Ocean` = "Esri.OceanBasemap",
-      `Esri Nat Geo` = "Esri.NatGeoWorldMap",
       `CartoDB Light` = "CartoDB.Positron",
       `CartoDB Light 2` = "CartoDB.PositronNoLabels",
       `CartoDB Dark` = "CartoDB.DarkMatter",
       `CartoDB Dark 2` = "CartoDB.DarkMatterNoLabels",
-      `OSM Mapnik` = "OpenStreetMap.Mapnik",
-      `OSM B&W` = "OpenStreetMap.BlackAndWhite"
+      `OSM Mapnik` = "OpenStreetMap.Mapnik"
     )
     for (i in 1:length(tile_providers)) {
       x <- x %>% addProviderTiles(providers[[tile_providers[[i]]]], options = providerTileOptions(noWrap = T), group = names(tile_providers)[i])
