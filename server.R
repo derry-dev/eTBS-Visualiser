@@ -269,6 +269,7 @@ function(input, output, session) {
         pickerInput("pltmap_fpid", "Select FP ID", NULL, multiple=T, options = list(`actions-box` = T, `live-search` = T), width="220px"),
         pickerInput("pltmap_legs", "Filter By Leg", NULL, multiple=T, options = list(`actions-box` = T, `live-search` = T), width="220px"),
         pickerInput("pltmap_volumes", "Display Volumes", NULL, multiple=T, options = list(`actions-box` = T, `live-search` = T), width="220px"),
+        pickerInput("pltmap_colour", "Colour Data", c("Path_Leg", "Mode_C", "Corrected_Mode_C"), selected="Path Leg", width="220px"),
         style = "simple",
         icon = icon("filter"),
         tooltip = tooltipOptions(title = "Plotting Options", placement = "right")
@@ -450,12 +451,16 @@ function(input, output, session) {
     } else {
       d <- tracks()[Path_Leg %in% input$pltmap_legs]
     }
-    p <- leafletProxy("pltmap", data=d) %>% clearGroup("Tracks") %>% removeControl("Leg_Legend")
-    pal <- colorFactor(brewer.pal(11, input$pltmap_marker_palette), domain=legs()$Path_Leg_Name)
+    p <- leafletProxy("pltmap", data=d) %>% clearGroup("Tracks") %>% removeControl("Legend")
+    pal <- if (input$pltmap_colour == "Path_Leg") {
+      colorFactor(brewer.pal(11, input$pltmap_marker_palette), domain=legs()$Path_Leg_Name)
+    } else {
+      colorNumeric(brewer.pal(11, input$pltmap_marker_palette), domain=d[[input$pltmap_colour]])
+    }
     p %>% addCircleMarkers(
       lng = ~Lon*180/pi,
       lat = ~Lat*180/pi,
-      color = ~pal(Path_Leg),
+      color = ~pal(eval(parse(text=input$pltmap_colour))),
       label=pltmap_lab(),
       labelOptions=labelOptions(textsize="13px", direction="auto"),
       weight=input$pltmap_marker_weight,
@@ -467,11 +472,11 @@ function(input, output, session) {
     ) %>%
       addLegend(
         position = "bottomleft",
-        title = "Leg",
+        title = input$pltmap_colour,
         pal = pal,
-        values = ~Path_Leg,
+        values = ~eval(parse(text=input$pltmap_colour)),
         opacity = 0.85,
-        layerId = "Leg_Legend"
+        layerId = "Legend"
       )
     update_pltmap$markers <- d
   })
