@@ -56,7 +56,7 @@ www <- tagList(
   tags$link(rel = "stylesheet", type = "text/css", href = "theme.css"),
   tags$link(rel = "stylesheet", type = "text/css", href = "wrappers.css"),
   tags$link(rel = "stylesheet", type = "text/css", href = "cheeky_tweaks.css"),
-  tags$link(rel = "stylesheet", type = "text/css", href = "loading_v2.css"),
+  tags$link(rel = "stylesheet", type = "text/css", href = "spinner.css"),
   tags$link(rel = "stylesheet", type = "text/css", href = "bttn.min.css"),
   tags$script(HTML("$('body').addClass('fixed');")),
   tags$script(src = "pltmap.js")
@@ -71,67 +71,109 @@ body_tab_db <- tabItem(
   box(
     title = "Database Explorer",
     width = NULL,
-    box(
-      solidHeader = T,
-      collapsible  = F,
+    collapsible  = T,
+    collapsed = T,
+    tabBox(
       width = NULL,
-      textAreaInput(
-        "db_query",
-        NULL,
-        placeholder = "Enter your query here...",
-        width = "100%",
-        height = "246px",
-        resize = "vertical"
+      tabPanel(
+        "Query Tool",
+        div(
+          textAreaInput(
+            "db_query",
+            NULL,
+            placeholder = "Enter your query here...",
+            width = "100%",
+            height = "246px",
+            resize = "vertical"
+          ),
+          div(
+            class = "centered",
+            actionButton("db_execute", "Execute", icon("play")),
+            div(style = "margin: 0 5px 0 5px"),
+            actionButton("db_clear", "Clear", icon("eraser"))
+          ),
+          DT::dataTableOutput("db_output")
+        )
       ),
-      div(
-        class = "centered",
-        actionButton("db_execute", "Execute", icon("play")),
-        div(style = "margin: 0 5px 0 5px"),
-        actionButton("db_clear", "Clear", icon("eraser"))
-      ),
-      DT::dataTableOutput("db_output")
+      tabPanel("Flight Plan",DT::dataTableOutput("db_fp_table")),
+      tabPanel("Landing Pair",DT::dataTableOutput("db_lp_table")),
+      tabPanel("Volumes", DT::dataTableOutput("db_volumes")),
+      tabPanel("Legs", DT::dataTableOutput("db_legs"))
     )
   ),
-  tabBox(
-    title = "Adaptation Data",
-    side = "right",
+  box(
+    title = "Flight Plan Statistics",
     width = NULL,
-    selected = "Aircraft",
-    tabPanel("Wake", DT::dataTableOutput("db_wake_adaptation_table")),
-    tabPanel("Runway", DT::dataTableOutput("db_runway_adaptation_table")),
-    tabPanel("DBS", DT::dataTableOutput("db_dbs_adaptation_table")),
-    tabPanel("Aircraft", DT::dataTableOutput("db_aircraft_adaptation_table"))
+    collapsible = T,
+    collapsed = T,
+    tabBox(
+      width = NULL,
+      tabPanel("General", DT::dataTableOutput("db_fp_general_table")),
+      tabPanel("Aircraft Type", DT::dataTableOutput("db_fp_type_table")),
+      tabPanel("Wake", DT::dataTableOutput("db_fp_wake_table")),
+      tabPanel("Runway", DT::dataTableOutput("db_fp_lrwy_table")),
+      tabPanel(
+        "Runway Hourly",
+        div(
+          div(class = "centered", h4("Runway Hourly Counts")),
+          DT::dataTableOutput("db_fp_lrwyt_table_1"),
+          div(class = "centered", h4("Runway Hourly Percentage (Numeric)")),
+          DT::dataTableOutput("db_fp_lrwyt_table_2"),
+          div(class = "centered", h4("Runway Hourly Percentage (String)")),
+          DT::dataTableOutput("db_fp_lrwyt_table_3")
+        )
+      )
+    )
+  ),
+  box(
+    title = "Landing Pair Statistics",
+    width = NULL,
+    collapsible = T,
+    collapsed = T,
+    tabBox(
+      width = NULL,
+      tabPanel("Wake", DT::dataTableOutput("db_lp_wake_table")),
+      tabPanel("Runway", DT::dataTableOutput("db_lp_lrwy_table")),
+      tabPanel(
+        "Wake By Runway",
+        div(
+          div(class = "centered", h4("Wake Runway Counts")),
+          DT::dataTableOutput("db_lp_wakerwy_table_1"),
+          div(class = "centered", h4("Wake Runway Percentage (Numeric)")),
+          DT::dataTableOutput("db_lp_wakerwy_table_2"),
+          div(class = "centered", h4("Wake Runway Percentage (String)")),
+          DT::dataTableOutput("db_lp_wakerwy_table_3")
+        )
+      )
+    )
+  ),
+  box(
+    title = "Adaptation Data",
+    width = NULL,
+    collapsible = T,
+    collapsed = T,
+    tabBox(
+      width = NULL,
+      tabPanel("Aircraft", DT::dataTableOutput("db_aircraft_adaptation_table")),
+      tabPanel("Wake", DT::dataTableOutput("db_wake_adaptation_table")),
+      tabPanel("DBS", DT::dataTableOutput("db_dbs_adaptation_table")),
+      tabPanel("Runway", DT::dataTableOutput("db_runway_adaptation_table"))
+    )
   )
 )
 
 body_tab_plt <- tabItem(
   "tab_plt",
   box(
+    style = "padding: 0",
     width = NULL,
+    height = 0,
+    solidHeader = T,
     leafletOutput("pltmap"),
     uiOutput("pltmap_filters_ui"),
-    hr(),
-    sliderInput(
-      "pltmap_time_range", 
-      "Choose Time Range:", 
-      min = NA,
-      max = NA, 
-      value = c(NA, NA),
-      step = 1,
-      round = T,
-      animate = animationOptions(interval = 100, loop = T),
-      dragRange = T
+    hidden(
+      uiOutput("pltmap_time_range_ui")
     )
-  ),
-  tabBox(
-    title = "Tables",
-    side = "right",
-    width = NULL,
-    selected = "Flight Plans",
-    tabPanel("Legs", DT::dataTableOutput("plt_legs")),
-    tabPanel("Volumes", DT::dataTableOutput("plt_volumes")),
-    tabPanel("Flight Plans", DT::dataTableOutput("plt_flightplans")),
-    tabPanel("Plotted Tracks", DT::dataTableOutput("plt_tracks"))
   )
 )
 

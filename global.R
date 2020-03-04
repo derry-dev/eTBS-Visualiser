@@ -4,20 +4,17 @@
 
 rm(list = ls())
 
-suppressPackageStartupMessages(library(shiny))
-suppressPackageStartupMessages(library(shinyjs))
-suppressPackageStartupMessages(library(shinydashboard))
-suppressPackageStartupMessages(library(shinyWidgets))
-suppressPackageStartupMessages(library(RODBC))
-suppressPackageStartupMessages(library(data.table))
-suppressPackageStartupMessages(library(DT))
-suppressPackageStartupMessages(library(leaflet))
-suppressPackageStartupMessages(library(sp))
-suppressPackageStartupMessages(library(RColorBrewer))
-suppressPackageStartupMessages(library(mapview))
-suppressPackageStartupMessages(library(plyr))
-suppressPackageStartupMessages(library(dplyr))
-suppressPackageStartupMessages(library(plotly))
+req <- scan(file.path(getwd(), "req.txt"), character(), quiet = T)
+if (length(req) > 0) {
+  missing_packages <- req[!(req %in% installed.packages()[,"Package"])]
+  if (length(missing_packages) > 0) {
+    install.packages(missing_packages, repos = "https://cloud.r-project.org", dependencies = T)
+    if ("mapview" %in% missing_packages) {
+      webshot::install_phantomjs()
+    }
+  }
+}
+suppressPackageStartupMessages(invisible(lapply(req, library, character.only = T)))
 
 source("defaults.R", local = T)
 
@@ -74,6 +71,23 @@ debug_dialogue <- function() {
       h4("session$clientData")
     ),
     verbatimTextOutput("clientdataText"),
+    size = "m",
+    footer = NULL,
+    easyClose = T
+  )
+}
+
+# ----------------------------------------------------------------------- #
+# Debug dialogue ----------------------------------------------------------
+# ----------------------------------------------------------------------- #
+
+db_stats_dialogue <- function() {
+  modalDialog(
+    div(
+      class = "centered",
+      h4("Database Statistics")
+    ),
+    DT::dataTableOutput("db_stats_table"),
     size = "m",
     footer = NULL,
     easyClose = T

@@ -25,7 +25,8 @@ function(input, output, session) {
   
   # Loading Spinner Icon
   output$spinner <- renderUI({
-    htmltools::HTML('<i class="fa fa-spinner fa-spin fa-3x fa-fw" style="font-size:24px"></i>')
+    # htmltools::HTML('<i class="fa fa-spinner fa-spin fa-3x fa-fw" style="font-size:24px"></i>')
+    htmltools::HTML('<div class="loader"></div>')
   })
   
   # Start-up show database connection dialogue
@@ -77,6 +78,370 @@ function(input, output, session) {
   # Clear query textbox
   observeEvent(input$db_clear, {
     updateTextAreaInput(session, "db_query", value="")
+  })
+  
+  # Database stats
+  
+  # tbl_Flight_Plan
+  flightplan <- reactive({
+    " SELECT * FROM tbl_Flight_Plan
+      LEFT JOIN (
+        SELECT Flight_Plan_ID AS Flight_Plan_ID_2, Time_At_4DME, Time_At_1DME FROM tbl_Flight_Plan_Derived
+      ) AS t ON Flight_Plan_ID = Flight_Plan_ID_2
+    " %>% sqlQuery(con(),.) %>% as.data.table() %>% .[,!c("Flight_Plan_ID_2")]
+  })
+  output$db_fp_table <- DT::renderDataTable({
+    datatable(
+      flightplan(),
+      rownames = F,
+      selection = "none",
+      options = list(
+        pageLength = 15,
+        lengthMenu = seq(5, 100, 5),
+        columnDefs = list(list(className = 'dt-center', targets = "_all")),
+        scrollX = T
+      )
+    )
+  })
+  
+  # tbl_Landing_Pair
+  landing_pairs <- reactive({
+    " SELECT * FROM tbl_Landing_Pair AS t1
+      LEFT JOIN (
+      	SELECT
+      		Flight_Plan_ID AS FPID1,
+      		Callsign AS Leader_Callsign,
+      		SSR_Code AS Leader_SSR_Code,
+      		Aircraft_Type AS Leader_Aircraft_Type,
+      		Wake_Vortex AS Leader_Wake_Vortex,
+      		Origin AS Leader_Origin,
+      		Destination AS Leader_Destination,
+      		Landing_Runway AS Leader_Landing_Runway
+      	FROM tbl_Flight_Plan
+      ) AS t2 ON t1.Leader_Flight_Plan_ID = t2.FPID1
+      LEFT JOIN (
+      	SELECT
+      		Flight_Plan_ID AS FPID2,
+      		Callsign AS Follower_Callsign,
+      		SSR_Code AS Follower_SSR_Code,
+      		Aircraft_Type AS Follower_Aircraft_Type,
+      		Wake_Vortex AS Follower_Wake_Vortex,
+      		Origin AS Follower_Origin,
+      		Destination AS Follower_Destination,
+      		Landing_Runway AS Follower_Landing_Runway
+      	FROM tbl_Flight_Plan
+      ) AS t3 ON t1.Follower_Flight_Plan_ID = t3.FPID2
+    " %>% sqlQuery(con(),.) %>% as.data.table() %>% .[,!c("FPID1", "FPID2")]
+  })
+  output$db_lp_table <- DT::renderDataTable({
+    datatable(
+      landing_pairs(),
+      rownames = F,
+      selection = "none",
+      options = list(
+        pageLength = 15,
+        lengthMenu = seq(5, 100, 5),
+        columnDefs = list(list(className = 'dt-center', targets = "_all")),
+        scrollX = T
+      )
+    )
+  })
+  
+  # tbl_Polygon
+  volumes <- eventReactive(con(), {
+    " SELECT * FROM tbl_Polygon
+      LEFT JOIN (
+        SELECT Volume_Name AS Volume_Name_2, Min_Altitude, Max_Altitude FROM tbl_Volume
+      ) AS t ON Volume_Name = Volume_Name_2
+    " %>% sqlQuery(con(),.) %>% as.data.table()
+  })
+  output$db_volumes <- DT::renderDataTable({
+    datatable(
+      volumes(),
+      rownames = F,
+      selection = "none",
+      options = list(
+        pageLength = 15,
+        lengthMenu = seq(5, 100, 5),
+        columnDefs = list(list(className = 'dt-center', targets = "_all")),
+        scrollX = T
+      )
+    )
+  })
+  
+  # tbl_Path_Leg
+  legs <- eventReactive(con(), {
+    " SELECT * FROM tbl_Path_Leg
+    " %>% sqlQuery(con(),.) %>% as.data.table()
+  })
+  output$db_legs <- DT::renderDataTable({
+    datatable(
+      legs(),
+      rownames = F,
+      selection = "none",
+      options = list(
+        pageLength = 15,
+        lengthMenu = seq(5, 100, 5),
+        columnDefs = list(list(className = 'dt-center', targets = "_all")),
+        scrollX = T
+      )
+    )
+  })
+
+  # Flight Plan Stats
+  
+  db_fp_stats <- reactive({
+    fp_id <- " SELECT Flight_Plan_ID FROM tbl_Flight_Plan
+    " %>% sqlQuery(con(),.) %>% unlist() %>% as.vector()
+    fpd_id <- " SELECT Flight_Plan_ID FROM tbl_Flight_Plan_Derived
+    " %>% sqlQuery(con(),.) %>% unlist() %>% as.vector()
+    both_id <- intersect(fp_id, fpd_id)
+    
+    fp_gen <- data.table(
+      `Name` = c(
+        "tbl_Flight_Plan All IDs",
+        "tbl_Flight_Plan Only IDs",
+        "tbl_Flight_Plan_Derived All IDs",
+        "tbl_Flight_Plan_Derived Only IDs",
+        "Shared IDs",
+        "Shared IDs Missing Time_At_4DME",
+        "Shared IDs Missing Time_At_1DME"
+      ),
+      Count = c(
+        length(fp_id),
+        length(setdiff(fp_id, both_id)),
+        length(fpd_id),
+        length(setdiff(fpd_id, both_id)),
+        length(both_id),
+        length(flightplan()$Time_At_4DME %>% .[is.na(.)]),
+        length(flightplan()$Time_At_1DME %>% .[is.na(.)])
+      )
+    )
+    
+    fp_ac <- as.data.table(table(flightplan()$Aircraft_Type))[order(V1)]
+    names(fp_ac) <- c("Aircraft Type", "Count")
+    fp_ac$`Percentage (Numeric)` <- fp_ac$Count / sum(fp_ac$Count)
+    fp_ac$`Percentage (String)` <- paste0(round(fp_ac$Count / sum(fp_ac$Count) * 100, 3), "%")
+    
+    fp_wake <- as.data.table(table(flightplan()$Wake_Vortex))
+    names(fp_wake) <- c("Wake Cat", "Count")
+    fp_wake$`Wake Cat` <- factor(fp_wake$`Wake Cat`, levels = c("J", "H", "UM", "M", "S", "L", LETTERS[1:7], NA))
+    fp_wake <- fp_wake[order(`Wake Cat`)]
+    fp_wake$`Percentage (Numeric)` <- fp_wake$Count / sum(fp_wake$Count)
+    fp_wake$`Percentage (String)` <- paste0(round(fp_wake$Count / sum(fp_wake$Count) * 100, 3), "%")
+    
+    fp_lrwy <- as.data.table(table(flightplan()$Landing_Runway))[order(V1)]
+    names(fp_lrwy) <- c("Landing Runway", "Count")
+    fp_lrwy$`Percentage (Numeric)` <- fp_lrwy$Count / sum(fp_lrwy$Count)
+    fp_lrwy$`Percentage (String)` <- paste0(round(fp_lrwy$Count / sum(fp_lrwy$Count) * 100, 3), "%")
+    
+    fp_lrwyt <- as.data.table(table(flightplan()$Landing_Runway, as.numeric(flightplan()$FP_Time) %/% 3600))
+    names(fp_lrwyt) <- c("Landing Runway", "Hour", "Count")
+    fp_lrwyt$Hour <- as.numeric(fp_lrwyt$Hour)
+    fp_lrwyt$`Percentage (Numeric)` <- fp_lrwyt$Count / sum(fp_lrwyt$Count)
+    fp_lrwyt$`Percentage (String)` <- paste0(round(fp_lrwyt$Count / sum(fp_lrwyt$Count) * 100, 3), "%")
+    
+    return(list(
+      fp_gen = fp_gen,
+      fp_ac = fp_ac,
+      fp_wake = fp_wake,
+      fp_lrwy = fp_lrwy,
+      fp_lrwyt_1 = tidyr::spread(fp_lrwyt[,!c("Percentage (Numeric)", "Percentage (String)")], Hour, Count),
+      fp_lrwyt_2 = tidyr::spread(fp_lrwyt[,!c("Count", "Percentage (String)")], Hour, `Percentage (Numeric)`),
+      fp_lrwyt_3 = tidyr::spread(fp_lrwyt[,!c("Count", "Percentage (Numeric)")], Hour, `Percentage (String)`)
+    ))
+  })
+  output$db_fp_general_table <- DT::renderDataTable({
+    datatable(
+      db_fp_stats()[["fp_gen"]],
+      rownames = F,
+      selection = "none",
+      options = list(
+        pageLength = 15,
+        lengthMenu = seq(5, 100, 5),
+        columnDefs = list(list(className = 'dt-center', targets = "_all")),
+        scrollX = T
+      )
+    )
+  })
+  output$db_fp_type_table <- DT::renderDataTable({
+    datatable(
+      db_fp_stats()[["fp_ac"]],
+      rownames = F,
+      selection = "none",
+      options = list(
+        pageLength = 15,
+        lengthMenu = seq(5, 100, 5),
+        columnDefs = list(list(className = 'dt-center', targets = "_all")),
+        scrollX = T
+      )
+    )
+  })
+  output$db_fp_wake_table <- DT::renderDataTable({
+    datatable(
+      db_fp_stats()[["fp_wake"]],
+      rownames = F,
+      selection = "none",
+      options = list(
+        pageLength = 15,
+        lengthMenu = seq(5, 100, 5),
+        columnDefs = list(list(className = 'dt-center', targets = "_all")),
+        scrollX = T
+      )
+    )
+  })
+  output$db_fp_lrwy_table <- DT::renderDataTable({
+    datatable(
+      db_fp_stats()[["fp_lrwy"]],
+      rownames = F,
+      selection = "none",
+      options = list(
+        pageLength = 15,
+        lengthMenu = seq(5, 100, 5),
+        columnDefs = list(list(className = 'dt-center', targets = "_all")),
+        scrollX = T
+      )
+    )
+  })
+  output$db_fp_lrwyt_table_1 <- DT::renderDataTable({
+    datatable(
+      db_fp_stats()[["fp_lrwyt_1"]],
+      rownames = F,
+      selection = "none",
+      options = list(
+        pageLength = 15,
+        lengthMenu = seq(5, 100, 5),
+        columnDefs = list(list(className = 'dt-center', targets = "_all")),
+        scrollX = T
+      )
+    )
+  })
+  output$db_fp_lrwyt_table_2 <- DT::renderDataTable({
+    datatable(
+      db_fp_stats()[["fp_lrwyt_2"]],
+      rownames = F,
+      selection = "none",
+      options = list(
+        pageLength = 15,
+        lengthMenu = seq(5, 100, 5),
+        columnDefs = list(list(className = 'dt-center', targets = "_all")),
+        scrollX = T
+      )
+    )
+  })
+  output$db_fp_lrwyt_table_3 <- DT::renderDataTable({
+    datatable(
+      db_fp_stats()[["fp_lrwyt_3"]],
+      rownames = F,
+      selection = "none",
+      options = list(
+        pageLength = 15,
+        lengthMenu = seq(5, 100, 5),
+        columnDefs = list(list(className = 'dt-center', targets = "_all")),
+        scrollX = T
+      )
+    )
+  })
+  
+  # Landing Pair Stats
+  
+  db_lp_stats <- reactive({
+    lp <- landing_pairs()
+    lp$Landing_Runway <- ifelse(
+      lp$Leader_Landing_Runway == lp$Follower_Landing_Runway,
+      lp$Leader_Landing_Runway,
+      paste0(lp$Leader_Landing_Runway, "-", lp$Follower_Landing_Runway)
+    )
+    lp$Wake_Vortex <- paste0(lp$Leader_Wake_Vortex, "-", lp$Follower_Wake_Vortex)
+    
+    lp_wake <- as.data.table(table(lp$Wake_Vortex))
+    names(lp_wake) <- c("Wake", "Count")
+    lp_wake$`Percentage (Numeric)` <- lp_wake$Count / sum(lp_wake$Count)
+    lp_wake$`Percentage (String)` <- paste0(round(lp_wake$Count / sum(lp_wake$Count) * 100, 3), "%")
+    
+    lp_rwy <- as.data.table(table(lp$Landing_Runway))[order(V1)]
+    names(lp_rwy) <- c("Runway", "Count")
+    lp_rwy$`Percentage (Numeric)` <- lp_rwy$Count / sum(lp_rwy$Count)
+    lp_rwy$`Percentage (String)` <- paste0(round(lp_rwy$Count / sum(lp_rwy$Count) * 100, 3), "%")
+    
+    lp_wakerwy <- as.data.table(table(lp$Wake_Vortex, lp$Landing_Runway))
+    names(lp_wakerwy) <- c("Wake", "Runway", "Count")
+    lp_wakerwy$`Percentage (Numeric)` <- lp_wakerwy$Count / sum(lp_wakerwy$Count)
+    lp_wakerwy$`Percentage (String)` <- paste0(round(lp_wakerwy$Count / sum(lp_wakerwy$Count) * 100, 3), "%")
+    
+    return(list(
+      lp_wake = lp_wake,
+      lp_rwy = lp_rwy,
+      lp_wakerwy = lp_wakerwy,
+      lp_wakerwy_1 = tidyr::spread(lp_wakerwy[,!c("Percentage (Numeric)", "Percentage (String)")], Runway, Count),
+      lp_wakerwy_2 = tidyr::spread(lp_wakerwy[,!c("Count", "Percentage (String)")], Runway, `Percentage (Numeric)`),
+      lp_wakerwy_3 = tidyr::spread(lp_wakerwy[,!c("Count", "Percentage (Numeric)")], Runway, `Percentage (String)`)
+    ))
+  })
+  output$db_lp_wake_table <- DT::renderDataTable({
+    datatable(
+      db_lp_stats()[["lp_wake"]],
+      rownames = F,
+      selection = "none",
+      options = list(
+        pageLength = 15,
+        lengthMenu = seq(5, 100, 5),
+        columnDefs = list(list(className = 'dt-center', targets = "_all")),
+        scrollX = T
+      )
+    )
+  })
+  output$db_lp_lrwy_table <- DT::renderDataTable({
+    datatable(
+      db_lp_stats()[["lp_rwy"]],
+      rownames = F,
+      selection = "none",
+      options = list(
+        pageLength = 15,
+        lengthMenu = seq(5, 100, 5),
+        columnDefs = list(list(className = 'dt-center', targets = "_all")),
+        scrollX = T
+      )
+    )
+  })
+  output$db_lp_wakerwy_table_1 <- DT::renderDataTable({
+    datatable(
+      db_lp_stats()[["lp_wakerwy_1"]],
+      rownames = F,
+      selection = "none",
+      options = list(
+        pageLength = 15,
+        lengthMenu = seq(5, 100, 5),
+        columnDefs = list(list(className = 'dt-center', targets = "_all")),
+        scrollX = T
+      )
+    )
+  })
+  output$db_lp_wakerwy_table_2 <- DT::renderDataTable({
+    datatable(
+      db_lp_stats()[["lp_wakerwy_2"]],
+      rownames = F,
+      selection = "none",
+      options = list(
+        pageLength = 15,
+        lengthMenu = seq(5, 100, 5),
+        columnDefs = list(list(className = 'dt-center', targets = "_all")),
+        scrollX = T
+      )
+    )
+  })
+  output$db_lp_wakerwy_table_3 <- DT::renderDataTable({
+    datatable(
+      db_lp_stats()[["lp_wakerwy_3"]],
+      rownames = F,
+      selection = "none",
+      options = list(
+        pageLength = 15,
+        lengthMenu = seq(5, 100, 5),
+        columnDefs = list(list(className = 'dt-center', targets = "_all")),
+        scrollX = T
+      )
+    )
   })
   
   # Adaptation Data Views
@@ -192,30 +557,6 @@ function(input, output, session) {
     leafletProxy("pltmap") %>% setView(lng = map_centre()$Lon, lat = map_centre()$Lat, zoom = 10)
   })
   
-  # tbl_Flight_Plan
-  flightplan <- reactive({
-    " SELECT * FROM tbl_Flight_Plan
-      LEFT JOIN (
-        SELECT Flight_Plan_ID AS Flight_Plan_ID_2, Time_At_4DME, Time_At_1DME FROM tbl_Flight_Plan_Derived
-      ) AS t ON Flight_Plan_ID = Flight_Plan_ID_2
-    " %>% sqlQuery(con(),.) %>% as.data.table()
-  })
-  
-  # tbl_Polygon
-  volumes <- eventReactive(con(), {
-    " SELECT * FROM tbl_Polygon
-      LEFT JOIN (
-        SELECT Volume_Name AS Volume_Name_2, Min_Altitude, Max_Altitude FROM tbl_Volume
-      ) AS t ON Volume_Name = Volume_Name_2
-    " %>% sqlQuery(con(),.) %>% as.data.table()
-  })
-  
-  # tbl_Path_Leg
-  legs <- eventReactive(con(), {
-    " SELECT * FROM tbl_Path_Leg
-    " %>% sqlQuery(con(),.) %>% as.data.table()
-  })
-  
   observeEvent(input$pltmap_fpid, {
     time_range <- sprintf(
       " SELECT MIN(Track_Time) AS Min_Time, MAX(Track_Time) AS Max_Time FROM tbl_Radar_Track_Point
@@ -263,15 +604,14 @@ function(input, output, session) {
   # PLT Map Top Left Dropdown & Screenshot Buttons
   output$pltmap_filters_ui <- renderUI({
     div(
-      style = "position: absolute; left: 20px; top: 21px; z-index: 100",
+      class = "pltmap-filters",
       dropdown(
         pickerInput("pltmap_fpdate", "Select Date", NULL, multiple=T, options = list(`actions-box` = T, `live-search` = T), width="220px"),
         pickerInput("pltmap_fpid", "Select FP ID", NULL, multiple=T, options = list(`actions-box` = T, `live-search` = T), width="220px"),
         pickerInput("pltmap_legs", "Filter By Leg", NULL, multiple=T, options = list(`actions-box` = T, `live-search` = T), width="220px"),
         pickerInput("pltmap_volumes", "Display Volumes", NULL, multiple=T, options = list(`actions-box` = T, `live-search` = T), width="220px"),
         pickerInput("pltmap_colour", "Colour Data", c("Path_Leg", "Mode_C", "Corrected_Mode_C"), selected="Path Leg", width="220px"),
-        style = "simple",
-        icon = icon("filter"),
+        style = "minimal", icon = icon("filter"),
         tooltip = tooltipOptions(title = "Plotting Options", placement = "right")
       ),
       div(style = "height: 5px"),
@@ -282,46 +622,62 @@ function(input, output, session) {
         sliderTextInput("pltmap_marker_opacity", "Opacity", choices=seq(0, 1, 0.01), selected=0.85, width="220px"),
         sliderTextInput("pltmap_marker_fillopacity", "Fill Opacity", choices=seq(0, 1, 0.01), selected=0.85, width="220px"),
         pickerInput("pltmap_marker_palette", "Colour Palette", rownames(brewer.pal.info), selected="Spectral", options = list(`live-search` = T), width="220px"),
-        style = "simple",
-        icon = div(style = "padding-right: 1px;", icon("bullseye")),
+        style = "minimal", icon = icon("bullseye"),
         tooltip = tooltipOptions(title = "Marker Settings", placement = "right")
       ),
       div(style = "height: 5px"),
       dropdown(
         div(style = "text-align: center", tags$b("Volume Polygon Settings")),
-        sliderTextInput("pltmap_volume_weight", "Weight", choices=seq(1, 50, 1), selected=5, width="220px"),
-        sliderTextInput("pltmap_volume_highlightweight", "Highlight Weight", choices=seq(1, 50, 1), selected=3, width="220px"),
-        sliderTextInput("pltmap_volume_dash", "Dash Size", choices=seq(1, 50, 1), selected=5, width="220px"),
-        sliderTextInput("pltmap_volume_opacity", "Opacity", choices=seq(0, 1, 0.01), selected=0.5, width="220px"),
-        sliderTextInput("pltmap_volume_highlightopacity", "Highlight Opacity", choices=seq(0, 1, 0.01), selected=0.5, width="220px"),
-        sliderTextInput("pltmap_volume_fillopacity", "Fill Opacity", choices=seq(0, 1, 0.01), selected=0.1, width="220px"),
-        sliderTextInput("pltmap_volume_highlightfillopacity", "Highlight Fill Opacity", choices=seq(0, 1, 0.01), selected=0.5, width="220px"),
-        div(style = "text-align: center", tags$b("Colour")),
+        div(style = "height: 5px;"),
         div(
-          style = "display: flex; justify-content: space-between; vertical-align: middle; margin-top: -18px;",
-          div(style = "padding-top: 25px", "R"),
-          textInput("pltmap_volume_colour_r", "", 255, width="46px"),
-          div(style = "padding-top: 25px", "G"),
-          textInput("pltmap_volume_colour_g", "", 0, width="46px"),
-          div(style = "padding-top: 25px", "B"),
-          textInput("pltmap_volume_colour_b", "", 0, width="46px")
+          style = "display: flex; flex-direction: row; flex-wrap: wrap; justify-content: space-around; height: 320px; width: 460px",
+          sliderTextInput("pltmap_volume_weight", "Weight", choices=seq(1, 50, 1), selected=5, width="220px"),
+          sliderTextInput("pltmap_volume_highlightweight", "Highlight Weight", choices=seq(1, 50, 1), selected=3, width="220px"),
+          sliderTextInput("pltmap_volume_opacity", "Opacity", choices=seq(0, 1, 0.01), selected=0.5, width="220px"),
+          sliderTextInput("pltmap_volume_highlightopacity", "Highlight Opacity", choices=seq(0, 1, 0.01), selected=0.5, width="220px"),
+          sliderTextInput("pltmap_volume_fillopacity", "Fill Opacity", choices=seq(0, 1, 0.01), selected=0.1, width="220px"),
+          sliderTextInput("pltmap_volume_highlightfillopacity", "Highlight Fill Opacity", choices=seq(0, 1, 0.01), selected=0.5, width="220px"),
+          sliderTextInput("pltmap_volume_dash", "Dash Size", choices=seq(1, 50, 1), selected=5, width="220px")
         ),
-        div(style = "text-align: center", tags$b("Highlight Colour")),
         div(
-          style = "display: flex; justify-content: space-between; vertical-align: middle; margin-top: -18px;",
-          div(style = "padding-top: 25px", "R"),
-          textInput("pltmap_volume_highlightcolour_r", "", 128, width="46px"),
-          div(style = "padding-top: 25px", "G"),
-          textInput("pltmap_volume_highlightcolour_g", "", 0, width="46px"),
-          div(style = "padding-top: 25px", "B"),
-          textInput("pltmap_volume_highlightcolour_b", "", 0, width="46px")
+          style = "display: inline-flex; flex-direction: column; flex-wrap: wrap; justify-content: space-between; height: 80px; width: 460px",
+          div(style = "padding-left: 23px;", tags$b("Colour")),
+          div(
+            style = "display: flex; justify-content: center; vertical-align: middle; margin-top: -18px;",
+            div(style = "padding: 26px 3px 0 10px", "R"),
+            textInput("pltmap_volume_colour_r", "", 255, width="46px"),
+            div(style = "padding: 26px 3px 0 10px", "G"),
+            textInput("pltmap_volume_colour_g", "", 0, width="46px"),
+            div(style = "padding: 26px 3px 0 10px", "B"),
+            textInput("pltmap_volume_colour_b", "", 0, width="46px")
+          ),
+          div(style = "padding-left: 23px;", tags$b("Highlight Colour")),
+          div(
+            style = "display: flex; justify-content: center; vertical-align: middle; margin-top: -18px;",
+            div(style = "padding: 26px 3px 0 10px", "R"),
+            textInput("pltmap_volume_highlightcolour_r", "", 128, width="46px"),
+            div(style = "padding: 26px 3px 0 10px", "G"),
+            textInput("pltmap_volume_highlightcolour_g", "", 0, width="46px"),
+            div(style = "padding: 26px 3px 0 10px", "B"),
+            textInput("pltmap_volume_highlightcolour_b", "", 0, width="46px")
+          )
         ),
-        style = "simple",
-        icon = icon("th"),
+        style = "minimal", icon = icon("draw-polygon"),
         tooltip = tooltipOptions(title = "Polygon Settings", placement = "right")
       ),
       div(style = "height: 5px"),
-      downloadButton("pltmap_screenshot", NULL, class = "bttn-simple")
+      dropdown(
+        div(
+          style = "width: 400px;",
+          DT::dataTableOutput("plt_tracks")
+        ),
+        style = "minimal", icon = icon("route"),
+        tooltip = tooltipOptions(title = "Plotted Tracks", placement = "right")
+      ),
+      div(style = "height: 5px"),
+      actionBttn("pltmap_toggle_timefilter", NULL, style = "minimal", icon = icon("clock")),
+      div(style = "height: 5px"),
+      downloadButton("pltmap_screenshot", NULL, class = "bttn-minimal")
     )
   })
   
@@ -579,21 +935,6 @@ function(input, output, session) {
     contentType = "image/png"
   )
   
-  # Render flightplan table
-  output$plt_flightplans <- DT::renderDataTable({
-    datatable(
-      flightplan(),
-      rownames = F,
-      selection = "none",
-      options = list(
-        pageLength = 15,
-        lengthMenu = seq(5, 100, 5),
-        columnDefs = list(list(className = 'dt-center', targets = "_all")),
-        scrollX = T
-      )
-    )
-  })
-  
   # Render subsetted tracks table
   output$plt_tracks <- DT::renderDataTable({
     datatable(
@@ -609,36 +950,35 @@ function(input, output, session) {
     )
   })
   
-  # Render volumes table
-  output$plt_volumes <- DT::renderDataTable({
-    datatable(
-      volumes(),
-      rownames = F,
-      selection = "none",
-      options = list(
-        pageLength = 15,
-        lengthMenu = seq(5, 100, 5),
-        columnDefs = list(list(className = 'dt-center', targets = "_all")),
-        scrollX = T
-      )
-    )
-  })
+  # Time range filter
   
-  # Render Path Legs table
-  output$plt_legs <- DT::renderDataTable({
-    datatable(
-      legs(),
-      rownames = F,
-      selection = "none",
-      options = list(
-        pageLength = 15,
-        lengthMenu = seq(5, 100, 5),
-        columnDefs = list(list(className = 'dt-center', targets = "_all")),
-        scrollX = T
+  output$pltmap_time_range_ui <- renderUI({
+    div(
+      style = "
+        position: absolute;
+        left: 45px;
+        right: 45px;
+        bottom: 35px;
+        z-index: 200;
+        height: 70px;
+      ",
+      sliderInput(
+        "pltmap_time_range",
+        NULL,
+        min = NA,
+        max = NA,
+        value = c(NA, NA),
+        step = 1,
+        round = T,
+        animate = animationOptions(interval = 100, loop = T),
+        dragRange = T,
+        width = "100%"
       )
     )
   })
 
+  onclick("pltmap_toggle_timefilter", toggle("pltmap_time_range_ui"))
+  
   # ----------------------------------------------------------------------- #
   # ORD Calibration Viewer --------------------------------------------------
   # ----------------------------------------------------------------------- #

@@ -1,0 +1,14 @@
+shiny
+shinyjs
+shinydashboard
+shinyWidgets
+RODBC
+data.table
+DT
+leaflet
+sp
+RColorBrewer
+mapview
+plyr
+dplyr
+plotly
