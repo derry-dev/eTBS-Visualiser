@@ -12,3 +12,4 @@ mapview
 plyr
 dplyr
 plotly
+clipr

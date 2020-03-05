@@ -668,7 +668,7 @@ function(input, output, session) {
       div(style = "height: 5px"),
       dropdown(
         div(
-          style = "width: 400px;",
+          style = "width: calc(100vw - 110px); height: 100%;",
           DT::dataTableOutput("plt_tracks")
         ),
         style = "minimal", icon = icon("route"),
@@ -676,6 +676,8 @@ function(input, output, session) {
       ),
       div(style = "height: 5px"),
       actionBttn("pltmap_toggle_timefilter", NULL, style = "minimal", icon = icon("clock")),
+      div(style = "height: 5px"),
+      actionBttn("pltmap_clearmarker", NULL, style = "minimal", icon = icon("eraser")),
       div(style = "height: 5px"),
       downloadButton("pltmap_screenshot", NULL, class = "bttn-minimal")
     )
@@ -954,13 +956,12 @@ function(input, output, session) {
   
   output$pltmap_time_range_ui <- renderUI({
     div(
+      class = "centered",
       style = "
-        position: absolute;
-        left: 45px;
-        right: 45px;
-        bottom: 35px;
-        z-index: 200;
-        height: 70px;
+        position: relative;
+        bottom: 85px;
+        z-index: 1000;
+        height: 0
       ",
       sliderInput(
         "pltmap_time_range",
@@ -972,12 +973,33 @@ function(input, output, session) {
         round = T,
         animate = animationOptions(interval = 100, loop = T),
         dragRange = T,
-        width = "100%"
+        width = "90%"
       )
     )
   })
 
   onclick("pltmap_toggle_timefilter", toggle("pltmap_time_range_ui"))
+  
+  observeEvent(input$pltmap_click, {
+    click <- input$pltmap_click
+    clat <- click$lat
+    clon <- click$lng
+    write_clip(paste(clat, clon))
+    lab <- sprintf("<b>Latitude</b>: %s<br/><b>Longitude</b>: %s", clat, clon) %>% lapply(htmltools::HTML)
+    leafletProxy("pltmap") %>%
+      addMarkers(
+        clon,
+        clat,
+        label = lab,
+        labelOptions = labelOptions(textsize="13px", direction="auto"),
+        options = markerOptions(opacity = 0.7),
+        group = "Clicked"
+      )
+  })
+  
+  observeEvent(input$pltmap_clearmarker, {
+    leafletProxy("pltmap") %>% clearGroup("Clicked")
+  })
   
   # ----------------------------------------------------------------------- #
   # ORD Calibration Viewer --------------------------------------------------
