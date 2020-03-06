@@ -112,17 +112,7 @@ body_tab_db <- tabItem(
       tabPanel("Aircraft Type", DT::dataTableOutput("db_fp_type_table")),
       tabPanel("Wake", DT::dataTableOutput("db_fp_wake_table")),
       tabPanel("Runway", DT::dataTableOutput("db_fp_lrwy_table")),
-      tabPanel(
-        "Runway Hourly",
-        div(
-          div(class = "centered", h4("Runway Hourly Counts")),
-          DT::dataTableOutput("db_fp_lrwyt_table_1"),
-          div(class = "centered", h4("Runway Hourly Percentage (Numeric)")),
-          DT::dataTableOutput("db_fp_lrwyt_table_2"),
-          div(class = "centered", h4("Runway Hourly Percentage (String)")),
-          DT::dataTableOutput("db_fp_lrwyt_table_3")
-        )
-      )
+      tabPanel("Runway Hourly", DT::dataTableOutput("db_fp_lrwyt_table"))
     )
   ),
   box(
@@ -130,21 +120,12 @@ body_tab_db <- tabItem(
     width = NULL,
     collapsible = T,
     collapsed = T,
+    pickerInput("db_lp_type", "Landing Pair Type",  NULL, multiple=T, options = list(`actions-box` = T, `live-search` = T), width="220px"),
     tabBox(
       width = NULL,
       tabPanel("Wake", DT::dataTableOutput("db_lp_wake_table")),
       tabPanel("Runway", DT::dataTableOutput("db_lp_lrwy_table")),
-      tabPanel(
-        "Wake By Runway",
-        div(
-          div(class = "centered", h4("Wake Runway Counts")),
-          DT::dataTableOutput("db_lp_wakerwy_table_1"),
-          div(class = "centered", h4("Wake Runway Percentage (Numeric)")),
-          DT::dataTableOutput("db_lp_wakerwy_table_2"),
-          div(class = "centered", h4("Wake Runway Percentage (String)")),
-          DT::dataTableOutput("db_lp_wakerwy_table_3")
-        )
-      )
+      tabPanel("Wake By Runway", DT::dataTableOutput("db_lp_wakerwy_table"))
     )
   ),
   box(

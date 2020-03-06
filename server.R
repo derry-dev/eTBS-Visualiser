@@ -64,16 +64,9 @@ function(input, output, session) {
   output$db_output <- DT::renderDataTable({
     datatable(
       query(),
-      rownames = F,
-      selection = "none",
-      options = list(
-        pageLength = 15,
-        lengthMenu = seq(5, 100, 5),
-        columnDefs = list(list(className = 'dt-center', targets = "_all")),
-        scrollX = T
-      )
+      rownames = F, selection = "none", extensions = c("Buttons"), style = "bootstrap4", options = list(pageLength = 15, lengthMenu = seq(5, 100, 5), columnDefs = list(list(className = 'dt-center', targets = "_all")), scrollX = T, dom = '<"dataTables_row"Bf><"dataTables_row"il>rtp', buttons = c('copy', 'csv', 'excel'))
     )
-  })
+  }, server = T)
   
   # Clear query textbox
   observeEvent(input$db_clear, {
@@ -84,68 +77,53 @@ function(input, output, session) {
   
   # tbl_Flight_Plan
   flightplan <- reactive({
-    " SELECT * FROM tbl_Flight_Plan
+    " SELECT
+      	t1.Flight_Plan_ID,
+      	t1.FP_Date,
+      	t1.FP_Time,
+      	t1.Callsign,
+      	t1.SSR_Code,
+      	t1.Aircraft_Type,
+      	t3.Wake AS \"Wake_Vortex\",
+      	t1.Origin,
+      	t1.Destination,
+      	t1.STAR,
+      	t1.SID,
+      	t1.Landing_Runway,
+      	t1.Departure_Runway,
+      	t2.Time_At_4DME,
+      	t2.Time_At_1DME
+      FROM tbl_Flight_Plan AS t1
       LEFT JOIN (
-        SELECT Flight_Plan_ID AS Flight_Plan_ID_2, Time_At_4DME, Time_At_1DME FROM tbl_Flight_Plan_Derived
-      ) AS t ON Flight_Plan_ID = Flight_Plan_ID_2
-    " %>% sqlQuery(con(),.) %>% as.data.table() %>% .[,!c("Flight_Plan_ID_2")]
+      	SELECT Flight_Plan_ID AS Flight_Plan_ID, Time_At_4DME, Time_At_1DME FROM tbl_Flight_Plan_Derived
+      ) AS t2 ON t1.Flight_Plan_ID = t2.Flight_Plan_ID
+      LEFT JOIN (
+      	SELECT * FROM tbl_Aircraft_Type_To_Wake
+      ) AS t3 ON t1.Aircraft_Type = t3.Aircraft_Type
+    " %>% sqlQuery(con(),.) %>% as.data.table()
   })
   output$db_fp_table <- DT::renderDataTable({
     datatable(
       flightplan(),
-      rownames = F,
-      selection = "none",
-      options = list(
-        pageLength = 15,
-        lengthMenu = seq(5, 100, 5),
-        columnDefs = list(list(className = 'dt-center', targets = "_all")),
-        scrollX = T
-      )
+      rownames = F, selection = "none", extensions = c("Buttons"), style = "bootstrap4", options = list(pageLength = 15, lengthMenu = seq(5, 100, 5), columnDefs = list(list(className = 'dt-center', targets = "_all")), scrollX = T, dom = '<"dataTables_row"Bf><"dataTables_row"il>rtp', buttons = c('copy', 'csv', 'excel'))
     )
-  })
+  }, server = T)
   
   # tbl_Landing_Pair
   landing_pairs <- reactive({
-    " SELECT * FROM tbl_Landing_Pair AS t1
-      LEFT JOIN (
-      	SELECT
-      		Flight_Plan_ID AS FPID1,
-      		Callsign AS Leader_Callsign,
-      		SSR_Code AS Leader_SSR_Code,
-      		Aircraft_Type AS Leader_Aircraft_Type,
-      		Wake_Vortex AS Leader_Wake_Vortex,
-      		Origin AS Leader_Origin,
-      		Destination AS Leader_Destination,
-      		Landing_Runway AS Leader_Landing_Runway
-      	FROM tbl_Flight_Plan
-      ) AS t2 ON t1.Leader_Flight_Plan_ID = t2.FPID1
-      LEFT JOIN (
-      	SELECT
-      		Flight_Plan_ID AS FPID2,
-      		Callsign AS Follower_Callsign,
-      		SSR_Code AS Follower_SSR_Code,
-      		Aircraft_Type AS Follower_Aircraft_Type,
-      		Wake_Vortex AS Follower_Wake_Vortex,
-      		Origin AS Follower_Origin,
-      		Destination AS Follower_Destination,
-      		Landing_Runway AS Follower_Landing_Runway
-      	FROM tbl_Flight_Plan
-      ) AS t3 ON t1.Follower_Flight_Plan_ID = t3.FPID2
-    " %>% sqlQuery(con(),.) %>% as.data.table() %>% .[,!c("FPID1", "FPID2")]
+    lp <- "SELECT * FROM tbl_Landing_Pair" %>% sqlQuery(con(),.) %>% as.data.table()
+    lead <- flightplan(); names(lead) <- paste0("Leader_", names(lead))
+    foll <- flightplan(); names(foll) <- paste0("Follower_", names(foll))
+    x <- merge(merge(lp, lead, by = "Leader_Flight_Plan_ID"), foll, by = "Follower_Flight_Plan_ID")
+    setcolorder(x, c(3, 4, 5, 2, seq(6, 19, 1), 1, seq(20, length(x), 1)))
+    return(x)
   })
   output$db_lp_table <- DT::renderDataTable({
     datatable(
       landing_pairs(),
-      rownames = F,
-      selection = "none",
-      options = list(
-        pageLength = 15,
-        lengthMenu = seq(5, 100, 5),
-        columnDefs = list(list(className = 'dt-center', targets = "_all")),
-        scrollX = T
-      )
+      rownames = F, selection = "none", extensions = c("Buttons"), style = "bootstrap4", options = list(pageLength = 15, lengthMenu = seq(5, 100, 5), columnDefs = list(list(className = 'dt-center', targets = "_all")), scrollX = T, dom = '<"dataTables_row"Bf><"dataTables_row"il>rtp', buttons = c('copy', 'csv', 'excel'))
     )
-  })
+  }, server = T)
   
   # tbl_Polygon
   volumes <- eventReactive(con(), {
@@ -158,16 +136,9 @@ function(input, output, session) {
   output$db_volumes <- DT::renderDataTable({
     datatable(
       volumes(),
-      rownames = F,
-      selection = "none",
-      options = list(
-        pageLength = 15,
-        lengthMenu = seq(5, 100, 5),
-        columnDefs = list(list(className = 'dt-center', targets = "_all")),
-        scrollX = T
-      )
+      rownames = F, selection = "none", extensions = c("Buttons"), style = "bootstrap4", options = list(pageLength = 15, lengthMenu = seq(5, 100, 5), columnDefs = list(list(className = 'dt-center', targets = "_all")), scrollX = T, dom = '<"dataTables_row"Bf><"dataTables_row"il>rtp', buttons = c('copy', 'csv', 'excel'))
     )
-  })
+  }, server = T)
   
   # tbl_Path_Leg
   legs <- eventReactive(con(), {
@@ -177,16 +148,9 @@ function(input, output, session) {
   output$db_legs <- DT::renderDataTable({
     datatable(
       legs(),
-      rownames = F,
-      selection = "none",
-      options = list(
-        pageLength = 15,
-        lengthMenu = seq(5, 100, 5),
-        columnDefs = list(list(className = 'dt-center', targets = "_all")),
-        scrollX = T
-      )
+      rownames = F, selection = "none", extensions = c("Buttons"), style = "bootstrap4", options = list(pageLength = 15, lengthMenu = seq(5, 100, 5), columnDefs = list(list(className = 'dt-center', targets = "_all")), scrollX = T, dom = '<"dataTables_row"Bf><"dataTables_row"il>rtp', buttons = c('copy', 'csv', 'excel'))
     )
-  })
+  }, server = T)
 
   # Flight Plan Stats
   
@@ -199,22 +163,24 @@ function(input, output, session) {
     
     fp_gen <- data.table(
       `Name` = c(
-        "tbl_Flight_Plan All IDs",
-        "tbl_Flight_Plan Only IDs",
-        "tbl_Flight_Plan_Derived All IDs",
-        "tbl_Flight_Plan_Derived Only IDs",
-        "Shared IDs",
-        "Shared IDs Missing Time_At_4DME",
-        "Shared IDs Missing Time_At_1DME"
+        "tbl_Flight_Plan ID count",
+        "tbl_Flight_Plan orphaned IDs",
+        "tbl_Flight_Plan_Derived ID count",
+        "tbl_Flight_Plan_Derived orphaned IDs",
+        "IDs missing Time_At_4DME",
+        "IDs missing Time_At_1DME",
+        "IDs missing WTC",
+        "Aircraft Types without WTC"
       ),
-      Count = c(
+      Value = c(
         length(fp_id),
-        length(setdiff(fp_id, both_id)),
+        paste(setdiff(fp_id, both_id),  collapse = ", "),
         length(fpd_id),
-        length(setdiff(fpd_id, both_id)),
-        length(both_id),
+        paste(setdiff(fpd_id, both_id),  collapse = ", "),
         length(flightplan()$Time_At_4DME %>% .[is.na(.)]),
-        length(flightplan()$Time_At_1DME %>% .[is.na(.)])
+        length(flightplan()$Time_At_1DME %>% .[is.na(.)]),
+        length(flightplan()$Wake_Vortex %>% .[is.na(.)]),
+        paste(unique(flightplan()[is.na(Wake_Vortex)]$Aircraft_Type), collapse = ", ")
       )
     )
     
@@ -238,118 +204,65 @@ function(input, output, session) {
     fp_lrwyt <- as.data.table(table(flightplan()$Landing_Runway, as.numeric(flightplan()$FP_Time) %/% 3600))
     names(fp_lrwyt) <- c("Landing Runway", "Hour", "Count")
     fp_lrwyt$Hour <- as.numeric(fp_lrwyt$Hour)
-    fp_lrwyt$`Percentage (Numeric)` <- fp_lrwyt$Count / sum(fp_lrwyt$Count)
-    fp_lrwyt$`Percentage (String)` <- paste0(round(fp_lrwyt$Count / sum(fp_lrwyt$Count) * 100, 3), "%")
+    fp_lrwyt$Count <- paste0(fp_lrwyt$Count, " (", round(fp_lrwyt$Count / sum(fp_lrwyt$Count) * 100, 3), "%)")
     
     return(list(
       fp_gen = fp_gen,
       fp_ac = fp_ac,
       fp_wake = fp_wake,
       fp_lrwy = fp_lrwy,
-      fp_lrwyt_1 = tidyr::spread(fp_lrwyt[,!c("Percentage (Numeric)", "Percentage (String)")], Hour, Count),
-      fp_lrwyt_2 = tidyr::spread(fp_lrwyt[,!c("Count", "Percentage (String)")], Hour, `Percentage (Numeric)`),
-      fp_lrwyt_3 = tidyr::spread(fp_lrwyt[,!c("Count", "Percentage (Numeric)")], Hour, `Percentage (String)`)
+      fp_lrwyt = tidyr::spread(fp_lrwyt, Hour, Count)
     ))
   })
   output$db_fp_general_table <- DT::renderDataTable({
     datatable(
       db_fp_stats()[["fp_gen"]],
-      rownames = F,
-      selection = "none",
-      options = list(
-        pageLength = 15,
-        lengthMenu = seq(5, 100, 5),
-        columnDefs = list(list(className = 'dt-center', targets = "_all")),
-        scrollX = T
-      )
+      rownames = F, selection = "none", extensions = c("Buttons"), style = "bootstrap4", options = list(pageLength = 15, lengthMenu = seq(5, 100, 5), columnDefs = list(list(className = 'dt-center', targets = "_all")), scrollX = T, dom = '<"dataTables_row"Bf><"dataTables_row"il>rtp', buttons = c('copy', 'csv', 'excel'))
     )
-  })
+  }, server = F)
   output$db_fp_type_table <- DT::renderDataTable({
     datatable(
       db_fp_stats()[["fp_ac"]],
-      rownames = F,
-      selection = "none",
-      options = list(
-        pageLength = 15,
-        lengthMenu = seq(5, 100, 5),
-        columnDefs = list(list(className = 'dt-center', targets = "_all")),
-        scrollX = T
-      )
+      rownames = F, selection = "none", extensions = c("Buttons"), style = "bootstrap4", options = list(pageLength = 15, lengthMenu = seq(5, 100, 5), columnDefs = list(list(className = 'dt-center', targets = "_all")), scrollX = T, dom = '<"dataTables_row"Bf><"dataTables_row"il>rtp', buttons = c('copy', 'csv', 'excel'))
     )
-  })
+  }, server = F)
   output$db_fp_wake_table <- DT::renderDataTable({
     datatable(
       db_fp_stats()[["fp_wake"]],
-      rownames = F,
-      selection = "none",
-      options = list(
-        pageLength = 15,
-        lengthMenu = seq(5, 100, 5),
-        columnDefs = list(list(className = 'dt-center', targets = "_all")),
-        scrollX = T
-      )
+      rownames = F, selection = "none", extensions = c("Buttons"), style = "bootstrap4", options = list(pageLength = 15, lengthMenu = seq(5, 100, 5), columnDefs = list(list(className = 'dt-center', targets = "_all")), scrollX = T, dom = '<"dataTables_row"Bf><"dataTables_row"il>rtp', buttons = c('copy', 'csv', 'excel'))
     )
-  })
+  }, server = F)
   output$db_fp_lrwy_table <- DT::renderDataTable({
     datatable(
       db_fp_stats()[["fp_lrwy"]],
-      rownames = F,
-      selection = "none",
-      options = list(
-        pageLength = 15,
-        lengthMenu = seq(5, 100, 5),
-        columnDefs = list(list(className = 'dt-center', targets = "_all")),
-        scrollX = T
-      )
+      rownames = F, selection = "none", extensions = c("Buttons"), style = "bootstrap4", options = list(pageLength = 15, lengthMenu = seq(5, 100, 5), columnDefs = list(list(className = 'dt-center', targets = "_all")), scrollX = T, dom = '<"dataTables_row"Bf><"dataTables_row"il>rtp', buttons = c('copy', 'csv', 'excel'))
     )
-  })
-  output$db_fp_lrwyt_table_1 <- DT::renderDataTable({
+  }, server = F)
+  output$db_fp_lrwyt_table <- DT::renderDataTable({
     datatable(
-      db_fp_stats()[["fp_lrwyt_1"]],
-      rownames = F,
-      selection = "none",
-      options = list(
-        pageLength = 15,
-        lengthMenu = seq(5, 100, 5),
-        columnDefs = list(list(className = 'dt-center', targets = "_all")),
-        scrollX = T
-      )
+      db_fp_stats()[["fp_lrwyt"]],
+      rownames = F, selection = "none", extensions = c("Buttons"), style = "bootstrap4", options = list(pageLength = 15, lengthMenu = seq(5, 100, 5), columnDefs = list(list(className = 'dt-center', targets = "_all")), scrollX = T, dom = '<"dataTables_row"Bf><"dataTables_row"il>rtp', buttons = c('copy', 'csv', 'excel'))
     )
-  })
-  output$db_fp_lrwyt_table_2 <- DT::renderDataTable({
-    datatable(
-      db_fp_stats()[["fp_lrwyt_2"]],
-      rownames = F,
-      selection = "none",
-      options = list(
-        pageLength = 15,
-        lengthMenu = seq(5, 100, 5),
-        columnDefs = list(list(className = 'dt-center', targets = "_all")),
-        scrollX = T
-      )
-    )
-  })
-  output$db_fp_lrwyt_table_3 <- DT::renderDataTable({
-    datatable(
-      db_fp_stats()[["fp_lrwyt_3"]],
-      rownames = F,
-      selection = "none",
-      options = list(
-        pageLength = 15,
-        lengthMenu = seq(5, 100, 5),
-        columnDefs = list(list(className = 'dt-center', targets = "_all")),
-        scrollX = T
-      )
-    )
-  })
+  }, server = F)
   
   # Landing Pair Stats
   
+  observeEvent(landing_pairs(), {
+    db_lp_type_choices <- landing_pairs()$Landing_Pair_Type %>% as.character() %>% unique()
+    updatePickerInput(
+      session,
+      "db_lp_type",
+      choices = db_lp_type_choices,
+      selected = db_lp_type_choices
+    )
+  })
+  
   db_lp_stats <- reactive({
-    lp <- landing_pairs()
+    req(input$db_lp_type)
+    lp <- landing_pairs()[Landing_Pair_Type %in% input$db_lp_type]
     lp$Landing_Runway <- ifelse(
       lp$Leader_Landing_Runway == lp$Follower_Landing_Runway,
-      lp$Leader_Landing_Runway,
+      as.character(lp$Leader_Landing_Runway),
       paste0(lp$Leader_Landing_Runway, "-", lp$Follower_Landing_Runway)
     )
     lp$Wake_Vortex <- paste0(lp$Leader_Wake_Vortex, "-", lp$Follower_Wake_Vortex)
@@ -366,83 +279,32 @@ function(input, output, session) {
     
     lp_wakerwy <- as.data.table(table(lp$Wake_Vortex, lp$Landing_Runway))
     names(lp_wakerwy) <- c("Wake", "Runway", "Count")
-    lp_wakerwy$`Percentage (Numeric)` <- lp_wakerwy$Count / sum(lp_wakerwy$Count)
-    lp_wakerwy$`Percentage (String)` <- paste0(round(lp_wakerwy$Count / sum(lp_wakerwy$Count) * 100, 3), "%")
+    lp_wakerwy$Count <- paste0(lp_wakerwy$Count, " (", round(lp_wakerwy$Count / sum(lp_wakerwy$Count) * 100, 3), "%)")
     
     return(list(
       lp_wake = lp_wake,
       lp_rwy = lp_rwy,
-      lp_wakerwy = lp_wakerwy,
-      lp_wakerwy_1 = tidyr::spread(lp_wakerwy[,!c("Percentage (Numeric)", "Percentage (String)")], Runway, Count),
-      lp_wakerwy_2 = tidyr::spread(lp_wakerwy[,!c("Count", "Percentage (String)")], Runway, `Percentage (Numeric)`),
-      lp_wakerwy_3 = tidyr::spread(lp_wakerwy[,!c("Count", "Percentage (Numeric)")], Runway, `Percentage (String)`)
+      lp_wakerwy = tidyr::spread(lp_wakerwy, Runway, Count)
     ))
   })
   output$db_lp_wake_table <- DT::renderDataTable({
     datatable(
       db_lp_stats()[["lp_wake"]],
-      rownames = F,
-      selection = "none",
-      options = list(
-        pageLength = 15,
-        lengthMenu = seq(5, 100, 5),
-        columnDefs = list(list(className = 'dt-center', targets = "_all")),
-        scrollX = T
-      )
+      rownames = F, selection = "none", extensions = c("Buttons"), style = "bootstrap4", options = list(pageLength = 15, lengthMenu = seq(5, 100, 5), columnDefs = list(list(className = 'dt-center', targets = "_all")), scrollX = T, dom = '<"dataTables_row"Bf><"dataTables_row"il>rtp', buttons = c('copy', 'csv', 'excel'))
     )
-  })
+  }, server = F)
   output$db_lp_lrwy_table <- DT::renderDataTable({
     datatable(
       db_lp_stats()[["lp_rwy"]],
-      rownames = F,
-      selection = "none",
-      options = list(
-        pageLength = 15,
-        lengthMenu = seq(5, 100, 5),
-        columnDefs = list(list(className = 'dt-center', targets = "_all")),
-        scrollX = T
-      )
+      rownames = F, selection = "none", extensions = c("Buttons"), style = "bootstrap4", options = list(pageLength = 15, lengthMenu = seq(5, 100, 5), columnDefs = list(list(className = 'dt-center', targets = "_all")), scrollX = T, dom = '<"dataTables_row"Bf><"dataTables_row"il>rtp', buttons = c('copy', 'csv', 'excel'))
     )
-  })
-  output$db_lp_wakerwy_table_1 <- DT::renderDataTable({
+  }, server = F)
+  output$db_lp_wakerwy_table <- DT::renderDataTable({
     datatable(
-      db_lp_stats()[["lp_wakerwy_1"]],
-      rownames = F,
-      selection = "none",
-      options = list(
-        pageLength = 15,
-        lengthMenu = seq(5, 100, 5),
-        columnDefs = list(list(className = 'dt-center', targets = "_all")),
-        scrollX = T
-      )
+      db_lp_stats()[["lp_wakerwy"]],
+      rownames = F, selection = "none", extensions = c("Buttons"), style = "bootstrap4", options = list(pageLength = 15, lengthMenu = seq(5, 100, 5), columnDefs = list(list(className = 'dt-center', targets = "_all")), scrollX = T, dom = '<"dataTables_row"Bf><"dataTables_row"il>rtp', buttons = c('copy', 'csv', 'excel'))
     )
-  })
-  output$db_lp_wakerwy_table_2 <- DT::renderDataTable({
-    datatable(
-      db_lp_stats()[["lp_wakerwy_2"]],
-      rownames = F,
-      selection = "none",
-      options = list(
-        pageLength = 15,
-        lengthMenu = seq(5, 100, 5),
-        columnDefs = list(list(className = 'dt-center', targets = "_all")),
-        scrollX = T
-      )
-    )
-  })
-  output$db_lp_wakerwy_table_3 <- DT::renderDataTable({
-    datatable(
-      db_lp_stats()[["lp_wakerwy_3"]],
-      rownames = F,
-      selection = "none",
-      options = list(
-        pageLength = 15,
-        lengthMenu = seq(5, 100, 5),
-        columnDefs = list(list(className = 'dt-center', targets = "_all")),
-        scrollX = T
-      )
-    )
-  })
+  }, server = F)
   
   # Adaptation Data Views
   
@@ -450,77 +312,45 @@ function(input, output, session) {
     " EXEC usp_GI_Get_ORD_Aircraft_Adaptation_Data
     " %>% sqlQuery(con(),.) %>% as.data.table()
   })
-  
   output$db_aircraft_adaptation_table <- DT::renderDataTable({
     datatable(
       db_aircraft_adaptation(),
-      rownames = F,
-      selection = "none",
-      options = list(
-        pageLength = 15,
-        lengthMenu = seq(5, 100, 5),
-        columnDefs = list(list(className = 'dt-center', targets = "_all")),
-        scrollX = T
-      )
+      rownames = F, selection = "none", extensions = c("Buttons"), style = "bootstrap4", options = list(pageLength = 15, lengthMenu = seq(5, 100, 5), columnDefs = list(list(className = 'dt-center', targets = "_all")), scrollX = T, dom = '<"dataTables_row"Bf><"dataTables_row"il>rtp', buttons = c('copy', 'csv', 'excel'))
     )
-  })
+  }, server = F)
   
   db_dbs_adaptation <- reactive({
     " EXEC usp_GI_Get_ORD_DBS_Adaptation_Data
     " %>% sqlQuery(con(),.) %>% as.data.table()
   })
-  
   output$db_dbs_adaptation_table <- DT::renderDataTable({
     datatable(
       db_dbs_adaptation(),
-      rownames = F,
-      selection = "none",
-      options = list(
-        pageLength = 15,
-        lengthMenu = seq(5, 100, 5),
-        columnDefs = list(list(className = 'dt-center', targets = "_all")),
-        scrollX = T
-      )
+      rownames = F, selection = "none", extensions = c("Buttons"), style = "bootstrap4", options = list(pageLength = 15, lengthMenu = seq(5, 100, 5), columnDefs = list(list(className = 'dt-center', targets = "_all")), scrollX = T, dom = '<"dataTables_row"Bf><"dataTables_row"il>rtp', buttons = c('copy', 'csv', 'excel'))
     )
-  })
+  }, server = F)
   
   db_runway_adaptation <- reactive({
     " EXEC usp_GI_Get_ORD_Runway_Adaptation_Data 'CYYZ'
     " %>% sqlQuery(con(),.) %>% as.data.table()
   })
-  
   output$db_runway_adaptation_table <- DT::renderDataTable({
     datatable(
       db_runway_adaptation(),
-      rownames = F,
-      selection = "none",
-      options = list(
-        pageLength = 15,
-        lengthMenu = seq(5, 100, 5),
-        columnDefs = list(list(className = 'dt-center', targets = "_all")),
-        scrollX = T
-      )
+      rownames = F, selection = "none", extensions = c("Buttons"), style = "bootstrap4", options = list(pageLength = 15, lengthMenu = seq(5, 100, 5), columnDefs = list(list(className = 'dt-center', targets = "_all")), scrollX = T, dom = '<"dataTables_row"Bf><"dataTables_row"il>rtp', buttons = c('copy', 'csv', 'excel'))
     )
-  })
+  }, server = F)
   
   db_wake_adaptation <- reactive({
     " EXEC usp_GI_Get_ORD_Wake_Adaptation_Data
     " %>% sqlQuery(con(),.) %>% as.data.table()
   })
-  
   output$db_wake_adaptation_table <- DT::renderDataTable({
     datatable(
       db_wake_adaptation(),
-      rownames = F,
-      selection = "none",
-      options = list(
-        pageLength = 15,
-        lengthMenu = seq(5, 100, 5),
-        columnDefs = list(list(className = 'dt-center', targets = "_all")),
-        scrollX = T
-      )
+      rownames = F, selection = "none", extensions = c("Buttons"), style = "bootstrap4", options = list(pageLength = 15, lengthMenu = seq(5, 100, 5), columnDefs = list(list(className = 'dt-center', targets = "_all")), scrollX = T, dom = '<"dataTables_row"Bf><"dataTables_row"il>rtp', buttons = c('copy', 'csv', 'excel'))
     )
-  })
+  }, server = F)
   
   # ----------------------------------------------------------------------- #
   # PLT Tab -----------------------------------------------------------------

@@ -21,3 +21,8 @@
 .nav-tabs-custom>.nav-tabs>li.active {
     border-top-color: #D51067;
 }
+
+.pagination>.active>a {
+    background-color: #D51067;
+    border-color: #D51067;
+}

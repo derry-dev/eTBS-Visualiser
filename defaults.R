@@ -12,3 +12,17 @@ db_defaults <- list(
   username = "ruser",
   password = "Th!nkruser"
 )
+
+load_packages <- function(path) {
+  req <- scan(path, character(), quiet = T)
+  if (length(req) > 0) {
+    missing_packages <- req[!(req %in% installed.packages()[,"Package"])]
+    if (length(missing_packages) > 0) {
+      install.packages(missing_packages, repos = "https://cloud.r-project.org", dependencies = T)
+      if ("mapview" %in% missing_packages) {
+        webshot::install_phantomjs()
+      }
+    }
+  }
+  suppressPackageStartupMessages(invisible(lapply(req, library, character.only = T)))
+}
