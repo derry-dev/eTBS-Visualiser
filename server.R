@@ -25,7 +25,6 @@ function(input, output, session) {
   
   # Loading Spinner Icon
   output$spinner <- renderUI({
-    # htmltools::HTML('<i class="fa fa-spinner fa-spin fa-3x fa-fw" style="font-size:24px"></i>')
     htmltools::HTML('<div class="loader"></div>')
   })
   
@@ -112,11 +111,20 @@ function(input, output, session) {
   # tbl_Landing_Pair
   landing_pairs <- reactive({
     lp <- "SELECT * FROM tbl_Landing_Pair" %>% sqlQuery(con(),.) %>% as.data.table()
-    lead <- flightplan(); names(lead) <- paste0("Leader_", names(lead))
-    foll <- flightplan(); names(foll) <- paste0("Follower_", names(foll))
-    x <- merge(merge(lp, lead, by = "Leader_Flight_Plan_ID"), foll, by = "Follower_Flight_Plan_ID")
-    setcolorder(x, c(3, 4, 5, 2, seq(6, 19, 1), 1, seq(20, length(x), 1)))
-    return(x)
+    if (nrow(lp) > 0 & nrow(flightplan()) > 0) {
+      lead <- flightplan(); names(lead) <- paste0("Leader_", names(lead))
+      foll <- flightplan(); names(foll) <- paste0("Follower_", names(foll))
+      x <- tryCatch(
+        merge(merge(lp, lead, by = "Leader_Flight_Plan_ID"), foll, by = "Follower_Flight_Plan_ID"),
+        error = function(e) NULL
+      )
+      if (!is.null(x)) {
+        setcolorder(x, c(3, 4, 5, 2, seq(6, 19, 1), 1, seq(20, length(x), 1)))
+      }
+      return(x)
+    } else {
+      return(lp)
+    }
   })
   output$db_lp_table <- DT::renderDataTable({
     datatable(
@@ -162,51 +170,55 @@ function(input, output, session) {
     both_id <- intersect(fp_id, fpd_id)
     track_fpid <-  " SELECT DISTINCT Flight_Plan_ID FROM tbl_Radar_Track_Point
     " %>% sqlQuery(con(),.) %>% unlist() %>% as.vector()
-    
-    fp_gen_list <- list(
-      "tbl_Flight_Plan ID count" = length(fp_id),
-      "tbl_Flight_Plan orphaned IDs" = paste(setdiff(fp_id, both_id),  collapse = ", "),
-      "tbl_Flight_Plan_Derived ID count" = length(fpd_id),
-      "tbl_Flight_Plan_Derived orphaned IDs" = paste(setdiff(fpd_id, both_id),  collapse = ", "),
-      "IDs missing Time_At_4DME" = length(flightplan()$Time_At_4DME %>% .[is.na(.)]),
-      "IDs missing Time_At_1DME" = length(flightplan()$Time_At_1DME %>% .[is.na(.)]),
-      "IDs missing WTC" = length(flightplan()$Wake_Vortex %>% .[is.na(.)]),
-      "Aircraft Types without WTC" = paste(unique(flightplan()[is.na(Wake_Vortex)]$Aircraft_Type), collapse = ", "),
-      "Flightplan IDs missing track point" = length(setdiff(both_id, track_fpid)),
-      "Track point IDs missing flightplan" = length(setdiff(track_fpid, both_id))
-    )
-    
-    fp_gen <- data.table(Name = names(fp_gen_list), Value = fp_gen_list)
-    
-    fp_ac <- as.data.table(table(flightplan()$Aircraft_Type))[order(V1)]
-    names(fp_ac) <- c("Aircraft Type", "Count")
-    fp_ac$`Percentage (Numeric)` <- fp_ac$Count / sum(fp_ac$Count)
-    fp_ac$`Percentage (String)` <- paste0(round(fp_ac$Count / sum(fp_ac$Count) * 100, 3), "%")
-    
-    fp_wake <- as.data.table(table(flightplan()$Wake_Vortex))
-    names(fp_wake) <- c("Wake Cat", "Count")
-    fp_wake$`Wake Cat` <- factor(fp_wake$`Wake Cat`, levels = c("J", "H", "UM", "M", "S", "L", LETTERS[1:7], NA))
-    fp_wake <- fp_wake[order(`Wake Cat`)]
-    fp_wake$`Percentage (Numeric)` <- fp_wake$Count / sum(fp_wake$Count)
-    fp_wake$`Percentage (String)` <- paste0(round(fp_wake$Count / sum(fp_wake$Count) * 100, 3), "%")
-    
-    fp_lrwy <- as.data.table(table(flightplan()$Landing_Runway))[order(V1)]
-    names(fp_lrwy) <- c("Landing Runway", "Count")
-    fp_lrwy$`Percentage (Numeric)` <- fp_lrwy$Count / sum(fp_lrwy$Count)
-    fp_lrwy$`Percentage (String)` <- paste0(round(fp_lrwy$Count / sum(fp_lrwy$Count) * 100, 3), "%")
-    
-    fp_lrwyt <- as.data.table(table(flightplan()$Landing_Runway, as.numeric(flightplan()$FP_Time) %/% 3600))
-    names(fp_lrwyt) <- c("Landing Runway", "Hour", "Count")
-    fp_lrwyt$Hour <- as.numeric(fp_lrwyt$Hour)
-    fp_lrwyt$Count <- paste0(fp_lrwyt$Count, " (", round(fp_lrwyt$Count / sum(fp_lrwyt$Count) * 100, 3), "%)")
-    
-    return(list(
-      fp_gen = fp_gen,
-      fp_ac = fp_ac,
-      fp_wake = fp_wake,
-      fp_lrwy = fp_lrwy,
-      fp_lrwyt = tidyr::spread(fp_lrwyt, Hour, Count)
-    ))
+    if (length(fp_id) > 0) {
+      
+      fp_gen_list <- list(
+        "tbl_Flight_Plan ID count" = length(fp_id),
+        "tbl_Flight_Plan orphaned IDs" = paste(setdiff(fp_id, both_id),  collapse = ", "),
+        "tbl_Flight_Plan_Derived ID count" = length(fpd_id),
+        "tbl_Flight_Plan_Derived orphaned IDs" = paste(setdiff(fpd_id, both_id),  collapse = ", "),
+        "IDs missing Time_At_4DME" = length(flightplan()$Time_At_4DME %>% .[is.na(.)]),
+        "IDs missing Time_At_1DME" = length(flightplan()$Time_At_1DME %>% .[is.na(.)]),
+        "IDs missing WTC" = length(flightplan()$Wake_Vortex %>% .[is.na(.)]),
+        "Aircraft Types without WTC" = paste(unique(flightplan()[is.na(Wake_Vortex)]$Aircraft_Type), collapse = ", "),
+        "Flightplan IDs missing track point" = length(setdiff(both_id, track_fpid)),
+        "Track point IDs missing flightplan" = length(setdiff(track_fpid, both_id))
+      )
+      
+      fp_gen <- data.table(Name = names(fp_gen_list), Value = fp_gen_list)
+      
+      fp_ac <- as.data.table(table(flightplan()$Aircraft_Type))[order(V1)]
+      names(fp_ac) <- c("Aircraft Type", "Count")
+      fp_ac$`Percentage (Numeric)` <- fp_ac$Count / sum(fp_ac$Count)
+      fp_ac$`Percentage (String)` <- paste0(round(fp_ac$Count / sum(fp_ac$Count) * 100, 3), "%")
+      
+      fp_wake <- as.data.table(table(flightplan()$Wake_Vortex))
+      names(fp_wake) <- c("Wake Cat", "Count")
+      fp_wake$`Wake Cat` <- factor(fp_wake$`Wake Cat`, levels = c("J", "H", "UM", "M", "S", "L", LETTERS[1:7], NA))
+      fp_wake <- fp_wake[order(`Wake Cat`)]
+      fp_wake$`Percentage (Numeric)` <- fp_wake$Count / sum(fp_wake$Count)
+      fp_wake$`Percentage (String)` <- paste0(round(fp_wake$Count / sum(fp_wake$Count) * 100, 3), "%")
+      
+      fp_lrwy <- as.data.table(table(flightplan()$Landing_Runway))[order(V1)]
+      names(fp_lrwy) <- c("Landing Runway", "Count")
+      fp_lrwy$`Percentage (Numeric)` <- fp_lrwy$Count / sum(fp_lrwy$Count)
+      fp_lrwy$`Percentage (String)` <- paste0(round(fp_lrwy$Count / sum(fp_lrwy$Count) * 100, 3), "%")
+      
+      fp_lrwyt <- as.data.table(table(flightplan()$Landing_Runway, as.numeric(flightplan()$FP_Time) %/% 3600))
+      names(fp_lrwyt) <- c("Landing Runway", "Hour", "Count")
+      fp_lrwyt$Hour <- as.numeric(fp_lrwyt$Hour)
+      fp_lrwyt$Count <- paste0(fp_lrwyt$Count, " (", round(fp_lrwyt$Count / sum(fp_lrwyt$Count) * 100, 3), "%)")
+      
+      return(list(
+        fp_gen = fp_gen,
+        fp_ac = fp_ac,
+        fp_wake = fp_wake,
+        fp_lrwy = fp_lrwy,
+        fp_lrwyt = tidyr::spread(fp_lrwyt, Hour, Count)
+      ))
+    } else {
+      return(NA)
+    }
   })
   output$db_fp_general_table <- DT::renderDataTable({
     datatable(
@@ -404,7 +416,7 @@ function(input, output, session) {
   })
   
   # Subsetted tbl_Radar_Track_Point
-  tracks_full <- eventReactive(input$pltmap_fpid, {
+  tracks_full <- eventReactive(input$pltmap_plot_tracks, {
     sprintf(
       " SELECT * FROM tbl_Radar_Track_Point
         LEFT JOIN (
@@ -422,7 +434,11 @@ function(input, output, session) {
   
   # Subsetted tbl_Radar_Track_Point
   tracks <- reactive({
-    tracks_full()[Track_Time >= input$pltmap_time_range[1] & Track_Time <= input$pltmap_time_range[2]]
+    if (!is.null(input$pltmap_time_range)) {
+      tracks_full()[Track_Time >= input$pltmap_time_range[1] & Track_Time <= input$pltmap_time_range[2]]
+    } else {
+      tracks_full()
+    }
   })
   
   # PLT Map Top Left Dropdown & Screenshot Buttons
@@ -433,10 +449,13 @@ function(input, output, session) {
         pickerInput("pltmap_fpdate", "Select Date", NULL, multiple=T, options = list(`actions-box` = T, `live-search` = T), width="220px"),
         pickerInput("pltmap_fpid", "Select FP ID", NULL, multiple=T, options = list(`actions-box` = T, `live-search` = T), width="220px"),
         pickerInput("pltmap_legs", "Filter By Leg", NULL, multiple=T, options = list(`actions-box` = T, `live-search` = T), width="220px"),
-        pickerInput("pltmap_volumes", "Display Volumes", NULL, multiple=T, options = list(`actions-box` = T, `live-search` = T), width="220px"),
-        pickerInput("pltmap_colour", "Colour Data", c("Path_Leg", "Mode_C", "Corrected_Mode_C"), selected="Path Leg", width="220px"),
-        style = "minimal", icon = icon("filter"),
-        tooltip = tooltipOptions(title = "Plotting Options", placement = "right")
+        div(
+          style = "display: flex; justify-content: space-between;",
+          actionButton("pltmap_clear_tracks", "Clear tracks"),
+          actionButton("pltmap_plot_tracks", "Plot tracks")
+        ),
+        style = "minimal", icon = icon("plane"),
+        tooltip = tooltipOptions(title = "Track Plotting", placement = "right")
       ),
       div(style = "height: 5px"),
       dropdown(
@@ -445,6 +464,7 @@ function(input, output, session) {
         sliderTextInput("pltmap_marker_weight", "Weight", choices=seq(1, 50, 1), selected=5, width="220px"),
         sliderTextInput("pltmap_marker_opacity", "Opacity", choices=seq(0, 1, 0.01), selected=0.85, width="220px"),
         sliderTextInput("pltmap_marker_fillopacity", "Fill Opacity", choices=seq(0, 1, 0.01), selected=0.85, width="220px"),
+        pickerInput("pltmap_colour", "Colour Data", c("Path_Leg", "Mode_C", "Corrected_Mode_C"), selected="Path Leg", width="220px"),
         pickerInput("pltmap_marker_palette", "Colour Palette", rownames(brewer.pal.info), selected="Spectral", options = list(`live-search` = T), width="220px"),
         style = "minimal", icon = icon("bullseye"),
         tooltip = tooltipOptions(title = "Marker Settings", placement = "right")
@@ -455,13 +475,14 @@ function(input, output, session) {
         div(style = "height: 5px;"),
         div(
           style = "display: flex; flex-direction: row; flex-wrap: wrap; justify-content: space-around; height: 320px; width: 460px",
+          pickerInput("pltmap_volumes", "Display Volumes", NULL, multiple=T, options = list(`actions-box` = T, `live-search` = T), width="220px"),
+          sliderTextInput("pltmap_volume_dash", "Dash Size", choices=seq(1, 50, 1), selected=5, width="220px"),
           sliderTextInput("pltmap_volume_weight", "Weight", choices=seq(1, 50, 1), selected=5, width="220px"),
           sliderTextInput("pltmap_volume_highlightweight", "Highlight Weight", choices=seq(1, 50, 1), selected=3, width="220px"),
           sliderTextInput("pltmap_volume_opacity", "Opacity", choices=seq(0, 1, 0.01), selected=0.5, width="220px"),
           sliderTextInput("pltmap_volume_highlightopacity", "Highlight Opacity", choices=seq(0, 1, 0.01), selected=0.5, width="220px"),
           sliderTextInput("pltmap_volume_fillopacity", "Fill Opacity", choices=seq(0, 1, 0.01), selected=0.1, width="220px"),
-          sliderTextInput("pltmap_volume_highlightfillopacity", "Highlight Fill Opacity", choices=seq(0, 1, 0.01), selected=0.5, width="220px"),
-          sliderTextInput("pltmap_volume_dash", "Dash Size", choices=seq(1, 50, 1), selected=5, width="220px")
+          sliderTextInput("pltmap_volume_highlightfillopacity", "Highlight Fill Opacity", choices=seq(0, 1, 0.01), selected=0.5, width="220px")
         ),
         div(
           style = "display: inline-flex; flex-direction: column; flex-wrap: wrap; justify-content: space-between; height: 80px; width: 460px",
@@ -518,12 +539,24 @@ function(input, output, session) {
   
   # Update FPID Filter Choices
   observeEvent(input$pltmap_fpdate, {
+    track_fpid_check <- sprintf(
+      " SELECT DISTINCT Flight_Plan_ID FROM tbl_Radar_Track_Point
+        WHERE Track_Date IN ('%s')
+      ", paste(input$pltmap_fpdate %>% as.character(), collapse = "','")
+    ) %>% sqlQuery(con(),.) %>% unlist() %>% as.vector() %>% as.character()
     pltmap_fpid_choices <- flightplan()[FP_Date %in% input$pltmap_fpdate, c("Flight_Plan_ID", "Callsign")][order(Flight_Plan_ID)] %>% unique()
     updatePickerInput(
       session,
       "pltmap_fpid",
       choices = pltmap_fpid_choices$Flight_Plan_ID %>% as.character(),
-      choicesOpt = list(subtext = pltmap_fpid_choices$Callsign %>% as.character())
+      choicesOpt = list(
+        subtext = pltmap_fpid_choices$Callsign %>% as.character(),
+        style = ifelse(
+          pltmap_fpid_choices$Flight_Plan_ID %>% as.character() %in% track_fpid_check, 
+          "background-color: green; color: white;",
+          "background-color: red; color: white"
+        )
+      )
     )
   })
   
@@ -551,20 +584,11 @@ function(input, output, session) {
   # PLT Map Track Point Labels
   pltmap_lab <- reactive({
     if (dim(tracks())[1] != 0 & dim(tracks())[2] != 0) {
-      sprintf("
-              <b>Callsign</b>: %s <font size='1'><b>FP ID</b> %s</font><br/>
-              <b>Time</b>: %s %s <font size='1'><b>Point ID</b> %s</font><br/>
-              <b>Mode C</b>: %s <b>Corrected</b>: %s<br/>
-              <b>Path Leg</b>: %s<br/>
-              <b>Range to ILS</b>: %s<br/>
-              <b>Range to Threshold</b>: %s<br/>
-              ",
-              tracks()$Callsign, tracks()$Flight_Plan_ID,
-              tracks()$Track_Date, tracks()$Track_Time, tracks()$Radar_Track_Point_ID,
-              tracks()$Mode_C, tracks()$Corrected_Mode_C,
-              tracks()$Path_Leg,
-              tracks()$Range_To_ILS,
-              tracks()$Range_To_Threshold
+      do.call(
+        sprintf, c(
+          list(paste(paste0("<b>", names(tracks()), "</b>: %s"), collapse = "<br/>")),
+          lapply(names(tracks()), function(x) tracks()[[x]])
+        )
       ) %>% lapply(htmltools::HTML)
     } else {
       NULL
@@ -661,6 +685,10 @@ function(input, output, session) {
         layerId = "Legend"
       )
     update_pltmap$markers <- d
+  })
+  
+  observeEvent(input$pltmap_clear_tracks, {
+    leafletProxy("pltmap") %>% clearGroup("Tracks") %>% removeControl("Legend")
   })
   
   # Plot volumes
@@ -819,366 +847,510 @@ function(input, output, session) {
   })
   
   # ----------------------------------------------------------------------- #
-  # ORD Calibration Viewer --------------------------------------------------
+  # ORD ---------------------------------------------------------------------
   # ----------------------------------------------------------------------- #
   
-  ord_dates <- reactive({
-    "   SET DATEFORMAT dmy
-        SELECT DISTINCT FP_Date, CAST(FP_Date AS datetime) AS Date FROM vw_ORD_Calibration_View
-        ORDER BY CAST(FP_Date AS datetime)
-    " %>% sqlQuery(con(),.) %>% .$FP_Date %>% unlist() %>% as.vector()
-  })
+  output$ordc_flow_diagram <- renderImage({
+    list(
+      src = "www/ordc.svg",
+      contentType = "image/svg+xml",
+      alt = "ORD Calibration Flow Diagram"
+    )
+  }, deleteFile = F)
   
-  ord_actypes <- reactive({
-    "   SELECT DISTINCT Follower_Aircraft_Type FROM vw_ORD_Calibration_View
-        ORDER BY Follower_Aircraft_Type
+  airfield <- reactive({
+    " SELECT Airfield_Name FROM tbl_Airfield
     " %>% sqlQuery(con(),.) %>% unlist() %>% as.vector()
   })
   
-  ord_wakes <- reactive({
-    "   SELECT DISTINCT Follower_RECAT_Wake_Turbulence_Category FROM vw_ORD_Calibration_View
-        ORDER BY Follower_RECAT_Wake_Turbulence_Category
-    " %>% sqlQuery(con(),.) %>% unlist() %>% as.vector()
-  })
+  # ordc_stage
   
-  output$tab_ord_ui_1 <- renderUI({
-    box(
-      title = "1. Search for Flights",
-      width = NULL,
-      solidHeader = T,
-      div(
-        style = "display: flex; justify-content: space-around; flex-wrap: wrap;",
-        pickerInput("ord_date", "Date in:", ord_dates(), multiple=T, options = list(`actions-box` = T, `live-search` = T), width="220px"),
-        div(style = "padding-top: 35px", "AND"),
-        pickerInput("ord_actype", "Aircraft Type in:", ord_actypes(), multiple=T, options = list(`actions-box` = T, `live-search` = T), width="220px"),
-        div(style = "padding-top: 35px", "AND"),
-        pickerInput("ord_wake", "Wake in:", ord_wakes(), multiple=T, options = list(`actions-box` = T, `live-search` = T), width="220px")
-      ),
-      div(
-        style = "text-align: center",
-        actionButton("ord_search", "Query")
-      )
-    )
-  })
+  # ORD Calibration Stages
+  ordc_currentstage <- reactiveVal("start")
   
-  ord_queried <- eventReactive(input$ord_search, {
-    sprintf(
-      "   SELECT * FROM vw_ORD_Calibration_View
-          WHERE FP_Date IN ('%s')
-          AND Follower_Aircraft_Type IN ('%s')
-          AND Follower_RECAT_Wake_Turbulence_Category IN ('%s')
-      ",
-      paste(as.character(input$ord_date), collapse = "','"),
-      paste(as.character(input$ord_actype), collapse = "','"),
-      paste(as.character(input$ord_wake), collapse = "','")
-    ) %>% sqlQuery(con(),.) %>% as.data.table()
-  })
   
-  observeEvent(ord_queried(), {
-    
-    output$tab_ord_ui_2 <- renderUI({
-      
-      ord_callsign_choices <- unique(ord_queried()[, c("Follower_Flight_Plan_ID", "Follower_Callsign")])
-      
-      ord_headwind_range <- c(
-        floor(min(ord_queried()$Follower_Threshold_Surface_Headwind, na.rm = T)),
-        ceiling(max(ord_queried()$Follower_Threshold_Surface_Headwind, na.rm = T))
-      )
-      
-      box(
-        title = "2. Filter Flights",
-        width = NULL,
-        solidHeader = T,
-        div(
-          style = "display: flex; justify-content: space-around; flex-wrap: wrap;",
-          pickerInput(
-            "ord_callsign",
-            "FPID/Callsign",
-            choices = ord_callsign_choices$Follower_Flight_Plan_ID %>% as.character(),
-            choicesOpt = list(subtext = ord_callsign_choices$Follower_Callsign %>% as.character()),
-            selected = ord_callsign_choices$Follower_Flight_Plan_ID %>% as.character(),
-            multiple = T,
-            options = list(`actions-box` = T, `live-search` = T),
-            width = "220px"
-          )
-        ),          
-        div(
-          style = "display: flex; justify-content: space-around; flex-wrap: wrap;",
-          sliderInput(
-            "ord_surfaceheadwind",
-            "Surface Headwind (kts)",
-            min = ord_headwind_range[1],
-            max = ord_headwind_range[2],
-            value = ord_headwind_range,
-            step = 0.1,
-            dragRange = T,
-            width = "450px"
-          )
-        ),
-        div(
-          style = "display: flex; justify-content: space-around; flex-wrap: wrap;",
-          materialSwitch("ord_remove_stationary", "Remove Stationary Points", value = T, status = "danger"),
-          materialSwitch("ord_remove_invalid_RTT", "Remove flights with bad RTT", value = T, status = "danger")
-        ),
-        div(
-          style = "text-align: center",
-          actionButton("ord_filter", "Filter")
-        )
-      )
-      
-    })
-    
-  })
+  # # ----------------------------------------------------------------------- #
+  # # Approach Speed Profiling ------------------------------------------------
+  # # ----------------------------------------------------------------------- #
+  # 
+  # # Name of output folder in project directory ---------------------------- #
+  # outdir_approach_speed_profiling <- "Speed Profiles - Sprint 0"
+  # 
+  # # Reference LSS type file ----------------------------------------------- #
+  # ref_lss_type_table <- "01a ORD Configuration Output Type v1.7.csv"
+  # 
+  # # Reference wake lookup file -------------------------------------------- #
+  # ref_wake_aircraft_table <- "UK and RECAT WTC Lookup.csv"
+  # 
+  # # Reference default wake adaptation file -------------------------------- #
+  # ref_wake_adaptation <- "01c ORD Configuration Output Wake v1.4.csv"
+  # 
+  # # WTC type -------------------------------------------------------------- #
+  # # Options:
+  # #   "REF_DATA"
+  # #   "DATABASE"
+  # wake_type <- "DATABASE"
+  # 
+  # # Speed type ------------------------------------------------------------ #
+  # # Options:
+  # #   "Mode_S_IAS" - preferred speed type
+  # #   "Track_Speed" - use only when Mode S IAS not available
+  # #   "Calculated_Speed" - use only when above options unsuitable
+  # speed_type <- "Mode_S_IAS"
+  # 
+  # # Airport altitude (ft asl) --------------------------------------------- #
+  # # NB: Used when speed_type != "Mode_S_IAS"
+  # airport_alt <- 550
+  # 
+  # # Set speed filtering parameters ---------------------------------------- #
+  # # NB: Used when speed_type == "Calculated_Speed"
+  # # For each flight, filters out calculated speeds which are not within
+  # #   [max(min(Track_Speed)*(speed_filter_perc/100), speed_filter_limit_low), 
+  # #    min(max(Track_Speed)*(1+speed_filter_perc/100), speed_filter_limit_high)]
+  # speed_filter_perc <- 50
+  # speed_filter_limit_low <- 50
+  # speed_filter_limit_high <- 200
+  # 
+  # # Start day number ------------------------------------------------------ #
+  # # Set to 1 to run script for all days
+  # start_day_num <- 1
+  # 
+  # # Run Approach Speed Profiling ------------------------------------------ #
+  # source("Approach Speed Profiling.R", local = T)
+  # 
+  # # ----------------------------------------------------------------------- #
+  # # Parameter Summary -------------------------------------------------------
+  # # ----------------------------------------------------------------------- #
+  # 
+  # # Name of speed profile folder to use ----------------------------------- #
+  # speed_profile_folder <- "Speed Profiles - Sprint 0"
+  # 
+  # # Name of output folder in project directory ---------------------------- #
+  # outdir_parameter_summary <- "Adaptation - Sprint 0 - Parameter Filter On"
+  # 
+  # # Generate new validation list? (Defaults to TRUE if list not found) ---- #
+  # validation_generation <- F
+  # 
+  # # Probability of dates being reserved for validation -------------------- #
+  # validation_threshold <- 0.25
+  # 
+  # # Parameter filter settings (*_filter variable must be set to TRUE) ----- #
+  # a1_filter <- T
+  # a1_min <- 100
+  # a1_max <- 160
+  # 
+  # a2_filter <- T
+  # a2_min <- 100
+  # a2_max <- 160
+  # 
+  # b_filter <- T
+  # b_min <- 100
+  # b_max <- 180
+  # 
+  # n1_filter <- T
+  # n1_min <- 1
+  # n1_max <- 6
+  # 
+  # n2_filter <- T
+  # n2_min <- 2
+  # n2_max <- 7
+  # 
+  # d_filter <- T
+  # d_min <- 0
+  # d_max <- 50
+  # 
+  # # Run Parameter Summary ------------------------------------------------- #
+  # source("Parameter Summary.R", local = T)
+  # 
+  # # ----------------------------------------------------------------------- #
+  # # Vref Comparison ---------------------------------------------------------
+  # # ----------------------------------------------------------------------- #
+  # # "Comparison is the thief of joy" - Theodore Roosevelt
+  # 
+  # # Directory of Populate_tbl_ORD_Aircraft_Adaptation_*.csv --------------- #
+  # adaptation_folder <- "Adaptation - Sprint 0 - Parameter Filter On"
+  # 
+  # # Run Vref Comparison --------------------------------------------------- #
+  # source("Vref Comparison.R", local = T)
+  # 
+  # # ----------------------------------------------------------------------- #
+  # # Validation Analysis -----------------------------------------------------
+  # # ----------------------------------------------------------------------- #
+  # 
+  # # Name of output folder in project directory ---------------------------- #
+  # outdir_validation_analysis <- "Validation - DB2"
+  # 
+  # # Reference ICAO 4 aircraft wake lookup --------------------------------- #
+  # ref_aircraft_wake_icao4 <- "reference_wake_category_icao.csv"
+  # 
+  # # Reference ICAO 4 wake separation table -------------------------------- #
+  # ref_ref_wake_icao4 <- "reference_wake_separation_dist_icao.csv"
+  # 
+  # # Performance Measure --------------------------------------------------- #
+  # operational_hour_multiplier <- 7.04167
+  # 
+  # # Use Validation_Date_List.csv to subset data? -------------------------- #
+  # val <- F
+  # # Validation_Date_List.csv directory (Parameter Summary folder)
+  # valset_folder <- "Adaptation - Sprint 0 - Parameter Filter Off"
+  # 
+  # # T/F Delivery to ROT Indicator/Wake Indicator (tighter) ---------------- #
+  # delivery_to_rot <- T
+  # 
+  # # Actual behaviour of the leader and follower --------------------------- #
+  # obs_lead_ias_min <- 80
+  # obs_lead_ias_max <- 180
+  # obs_follow_ias_min <- 100
+  # obs_follow_ias_max <- 200
+  # obs_follow_ias_max_tight <- 200
+  # 
+  # # ORD behaviours (to exclude current issues with algorithm) ------------- #
+  # ord_lead_ias_min <- 80
+  # ord_lead_ias_max <- 180
+  # ord_follow_ias_min <- 100
+  # ord_follow_ias_max <- 200
+  # 
+  # # Separation Accuracy: Entire Dataset ----------------------------------- #
+  # sep_accuracy_max <- 3
+  # sep_accuracy_max_a380 <- 3
+  # 
+  # # Separation Accuracy: Tight Dataset ------------------------------------ #
+  # sep_accuracy_max_tight <- 1.5
+  # sep_accuracy_max_a380_tight <- 1.5
+  # 
+  # # GSPD filter for GSPD Diff 0_8/ac -------------------------------------- #
+  # enable_GSPD_filter <- T # Do not set to TRUE if GSPD data is not used!
+  # min_Follower_GSPD_Diff_ac <- 10
+  # min_Follower_GSPD_Diff_0_8 <- 30
+  # 
+  # # Aircraft types to report performance metrics -------------------------- #
+  # # NB: Leave blank to use all aircraft types in validation view
+  # report_performance_actypes <- c(
+  #   
+  # )
+  # 
+  # # Run Validation Analysis ----------------------------------------------- #
+  # source("Validation Analysis.R", local = T)
   
-  observeEvent(input$ord_callsign, {
-    ord_surfaceheadwind_choices <- range(ord_queried()[Follower_Flight_Plan_ID %in% input$ord_callsign]$Follower_Threshold_Surface_Headwind, na.rm = T)
-    updateSliderInput(
-      session,
-      "ord_surfaceheadwind",
-      min = ord_surfaceheadwind_choices[1],
-      max = ord_surfaceheadwind_choices[2],
-      value = ord_surfaceheadwind_choices
-    )
-  })
   
-  ord_filtered <- eventReactive(input$ord_filter, {
-    x <- ord_queried()[Follower_Flight_Plan_ID %in% input$ord_callsign]
-    invalid_RTT <- ddply(
-      x, "Follower_Flight_Plan_ID", summarise,
-      MinRTT = min(Follower_Range_To_Threshold, na.rm = T),
-      MaxRTT = max(Follower_Range_To_Threshold, na.rm = T),
-      Surface_Headwind = min(Follower_Threshold_Surface_Headwind, na.rm = T)
-    ) %>% 
-      as.data.table() %>%
-      .[Surface_Headwind >= input$ord_surfaceheadwind[1] & Surface_Headwind <= input$ord_surfaceheadwind[2]]
-    if (input$ord_remove_invalid_RTT) {
-      invalid_RTT <- invalid_RTT[MinRTT >= 1 | MaxRTT < 4]
-    }
-    x <- x[Follower_Flight_Plan_ID %!in% invalid_RTT$Follower_Flight_Plan_ID]
-    if (input$ord_remove_stationary) {
-      k <- 2
-      while (k <= nrow(x)) {
-        same_range <- x$Follower_Range_To_Threshold[k] == x$Follower_Range_To_Threshold[k-1]
-        same_x <- x$X_Position[k] == x$X_Position[k-1]
-        same_y <- x$Y_Position[k] == x$Y_Position[k-1]
-        if (same_range | (same_x & same_y)) {
-          x <- x[-k]
-        } else {
-          k <- k + 1
-        }
-      }
-    }
-    return(x)
-  })
   
-  observeEvent(input$ord_filter, {
-    
-    output$tab_ord_ui_3 <- renderUI({
-      box(
-        title = "3. Calibration Settings",
-        width = NULL,
-        solidHeader = T,
-        DT::dataTableOutput("ord_queried_output"),
-        div(style = "height: 5px"),
-        div(
-          style = "display: flex; justify-content: space-around; flex-wrap: wrap;",
-          radioGroupButtons(
-            "ord_speedtype",
-            "Speed Type",
-            choices = c("Track Speed", "Mode S GSPD", "Mode S IAS", "Mode S TAS", "Derived GSPD"),
-            selected = "Derived GSPD"
-          )
-        ),
-        div(
-          style = "text-align: center",
-          actionButton("ord_run", "Run Calibration")
-        )
-      )
-    })
-    
-  })
-  
-  output$ord_queried_output <- DT::renderDataTable({
-    datatable(
-      ord_filtered(),
-      rownames = F,
-      selection = "none",
-      options = list(
-        pageLength = 5,
-        lengthMenu = seq(5, 100, 5),
-        columnDefs = list(list(className = 'dt-center', targets = "_all")),
-        scrollX = T
-      )
-    )
-  })
-  
-  observeEvent(input$ord_run, {
-    
-    output$tab_ord_ui_4 <- renderUI({
-      box(
-        title = "4. Calibration Output",
-        width = NULL,
-        solidHeader = T,
-        plotlyOutput("ord_speedprofile_plot"),
-        div(style = "height: 5px;"),
-        verbatimTextOutput("ord_nls_print")
-      )
-    })
-    
-  })
-  
-  ord_nls <- eventReactive(input$ord_run, {
-    
-    if (nrow(ord_filtered()) == 0) return(list(x = NA, y = NA, m = NA))
-    
-    if (input$ord_speedtype == "Derived GSPD") {
-      
-      # Calculate speed based on positional difference between timestamps
-      tracks_new <- ord_filtered()[,c("Track_Time", "Follower_Threshold_Surface_Headwind", "Follower_Range_To_Threshold", "X_Position", "Y_Position", "Altitude", "Track_Speed")]
-      tracks_new$Distance_Travelled <- NA
-      for (k in 2:nrow(tracks_new)) {
-        tracks_new$Distance_Travelled[k] <- sqrt((tracks_new$X_Position[k] - tracks_new$X_Position[k-1])^2 + (tracks_new$Y_Position[k] - tracks_new$Y_Position[k-1])^2 + ((tracks_new$Altitude[k] - tracks_new$Altitude[k-1])/6076.12)^2)
-        if (k == 2) {
-          tracks_new$Distance_Travelled[k-1] <- tracks_new$Distance_Travelled[k]
-        }
-      }
-      tracks_new$Point_Speed <- NA
-      tracks_new$Point_Speed[1] <- tracks_new$Track_Speed[1]
-      for (k in 2:nrow(tracks_new)) {
-        tracks_new$Point_Speed[k] <- tracks_new$Distance_Travelled[k]/((tracks_new$Track_Time[k]-tracks_new$Track_Time[k-1])/3600)
-      }
-      
-      # Filter strange speeds (20% above or below Track_Speed range)
-      tracks_new <- tracks_new[Point_Speed >= max(min(tracks_new$Track_Speed, na.rm=T)*0.8, 50, na.rm=T) & Point_Speed <= max(tracks_new$Track_Speed, na.rm=T)*1.2]
-      
-      # Get tracks x and y vectors
-      x <- tracks_new$Follower_Range_To_Threshold
-      y <- (tracks_new$Point_Speed+tracks_new$Follower_Threshold_Surface_Headwind)/(1+550/60000)
-      
-    } else {
-      
-      x <- ord_filtered()[["Follower_Range_To_Threshold"]]
-      y <- ord_filtered()[[gsub(" ", "_", input$ord_speedtype)]]
-      
-    }
-    
-    if (length(x) < length(y)) {
-      y <- y[1:length(x)]
-    } else if (length(x) > length(y)) {
-      x <- x[1:length(y)]
-    }
-    
-    # Generate NLS model
-    m <- tryCatch(
-      suppressWarnings(nls(
-        y ~ airspeed_model_vector_break(x, a, a1, b, n1, n2),
-        start = list(a = 140, a1 = 140, b = 160, n1 = 3, n2 = 4),
-        control = nls.control(tol = 0.001, minFactor = 1/ 16384, warnOnly = T)
-      )),
-      error = function(e) NULL
-    )
-    
-    # Generate Simplified NLS model if first one fails
-    if (is.null(m)) {
-      x <- x %>% .[. <= 2]
-      y <- y[1:length(x)]
-      m <- tryCatch(
-        suppressWarnings(nls(
-          y ~ airspeed_model_vector_break_simplified(x, a, a1),
-          start = list(a = 140, a1 = 140),
-          control = nls.control(tol = 0.001, minFactor = 1/ 16384, warnOnly = T)
-        )),
-        error = function(e) NULL
-      )
-    }
-    
-    # Generate Even More Simplified (TM) NLS model if previous ones fail
-    if (is.null(m)) {
-      m <- tryCatch(
-        suppressWarnings(nls(
-          y ~ a,
-          start = list(a = 140),
-          control = nls.control(tol = 0.001, minFactor = 1/ 16384, warnOnly = T)
-        )),
-        error = function(e) NULL
-      )
-    }
-    
-    return(list(x = x, y = y, m = m))
-    
-  })
-  
-  observeEvent(ord_nls(), {
-    
-    output$ord_speedprofile_plot <- renderPlotly({
-      p <- plot_ly() %>%
-        add_markers(
-          x = ord_nls()$x,
-          y = ord_nls()$y,
-          name = "Raw Data",
-          marker = list(color = "rgb(128,34,69)")
-        ) %>%
-        add_lines(
-          x = ord_nls()$x,
-          y = ord_nls()$m$m$fitted(),
-          name = "Fitted Profile",
-          line = list(color = "rgb(213,16,103)")
-        ) %>%
-        layout(
-          hovermode = "compare",
-          xaxis = list(title = "Follower Range to Threshold (NM)"),
-          yaxis = list(title = "Speed (kts)")
-        ) %>%
-        config(
-          displaylogo = F
-        )
-      ggplotly(p, width = session$clientData$output_ord_speedprofile_plot_width) # Width fix
-    })
-    
-    output$ord_nls_print <- renderPrint({
-      print(ord_nls())
-    })
-    
-  })
-  
-  # ----------------------------------------------------------------------- #
-  # Landing Pair Viewer -----------------------------------------------------
-  # ----------------------------------------------------------------------- #
-  
-  # db_lp_ids <- reactive({
-  #   " SELECT DISTINCT Landing_Pair_ID
-  #     FROM vw_All_Pair_Reference_Data
-  #     ORDER BY Landing_Pair_ID
+  # ord_dates <- reactive({
+  #   "   SET DATEFORMAT dmy
+  #       SELECT DISTINCT FP_Date, CAST(FP_Date AS datetime) AS Date FROM vw_ORD_Calibration_View
+  #       ORDER BY CAST(FP_Date AS datetime)
+  #   " %>% sqlQuery(con(),.) %>% .$FP_Date %>% unlist() %>% as.vector()
+  # })
+  # 
+  # ord_actypes <- reactive({
+  #   "   SELECT DISTINCT Follower_Aircraft_Type FROM vw_ORD_Calibration_View
+  #       ORDER BY Follower_Aircraft_Type
   #   " %>% sqlQuery(con(),.) %>% unlist() %>% as.vector()
   # })
   # 
-  # output$tab_ord_ui_a <- renderUI({
+  # ord_wakes <- reactive({
+  #   "   SELECT DISTINCT Follower_RECAT_Wake_Turbulence_Category FROM vw_ORD_Calibration_View
+  #       ORDER BY Follower_RECAT_Wake_Turbulence_Category
+  #   " %>% sqlQuery(con(),.) %>% unlist() %>% as.vector()
+  # })
+  # 
+  # output$tab_ord_ui_1 <- renderUI({
   #   box(
+  #     title = "1. Search for Flights",
   #     width = NULL,
   #     solidHeader = T,
   #     div(
   #       style = "display: flex; justify-content: space-around; flex-wrap: wrap;",
-  #       textAreaInput(
-  #         "lp_select",
-  #         NULL,
-  #         placeholder = "Landing Pair ID",
-  #         width = "100%",
-  #         height = "38px",
-  #         resize = "none"
-  #       )
+  #       pickerInput("ord_date", "Date in:", ord_dates(), multiple=T, options = list(`actions-box` = T, `live-search` = T), width="220px"),
+  #       div(style = "padding-top: 35px", "AND"),
+  #       pickerInput("ord_actype", "Aircraft Type in:", ord_actypes(), multiple=T, options = list(`actions-box` = T, `live-search` = T), width="220px"),
+  #       div(style = "padding-top: 35px", "AND"),
+  #       pickerInput("ord_wake", "Wake in:", ord_wakes(), multiple=T, options = list(`actions-box` = T, `live-search` = T), width="220px")
   #     ),
   #     div(
   #       style = "text-align: center",
-  #       actionButton("lp_search", "Search")
+  #       actionButton("ord_search", "Query")
   #     )
   #   )
   # })
   # 
-  # db_lp_lead_tracks <- eventReactive(input$lp_search, {
-  #   " SELECT DISTINCT Landing_Pair_ID
-  #     FROM vw_All_Pair_Reference_Data
-  #     ORDER BY Landing_Pair_ID
-  #   " %>% sqlQuery(con(),.) %>% unlist() %>% as.vector()
+  # ord_queried <- eventReactive(input$ord_search, {
+  #   sprintf(
+  #     "   SELECT * FROM vw_ORD_Calibration_View
+  #         WHERE FP_Date IN ('%s')
+  #         AND Follower_Aircraft_Type IN ('%s')
+  #         AND Follower_RECAT_Wake_Turbulence_Category IN ('%s')
+  #     ",
+  #     paste(as.character(input$ord_date), collapse = "','"),
+  #     paste(as.character(input$ord_actype), collapse = "','"),
+  #     paste(as.character(input$ord_wake), collapse = "','")
+  #   ) %>% sqlQuery(con(),.) %>% as.data.table()
+  # })
+  # 
+  # observeEvent(ord_queried(), {
+  #   
+  #   output$tab_ord_ui_2 <- renderUI({
+  #     
+  #     ord_callsign_choices <- unique(ord_queried()[, c("Follower_Flight_Plan_ID", "Follower_Callsign")])
+  #     
+  #     ord_headwind_range <- c(
+  #       floor(min(ord_queried()$Follower_Threshold_Surface_Headwind, na.rm = T)),
+  #       ceiling(max(ord_queried()$Follower_Threshold_Surface_Headwind, na.rm = T))
+  #     )
+  #     
+  #     box(
+  #       title = "2. Filter Flights",
+  #       width = NULL,
+  #       solidHeader = T,
+  #       div(
+  #         style = "display: flex; justify-content: space-around; flex-wrap: wrap;",
+  #         pickerInput(
+  #           "ord_callsign",
+  #           "FPID/Callsign",
+  #           choices = ord_callsign_choices$Follower_Flight_Plan_ID %>% as.character(),
+  #           choicesOpt = list(subtext = ord_callsign_choices$Follower_Callsign %>% as.character()),
+  #           selected = ord_callsign_choices$Follower_Flight_Plan_ID %>% as.character(),
+  #           multiple = T,
+  #           options = list(`actions-box` = T, `live-search` = T),
+  #           width = "220px"
+  #         )
+  #       ),          
+  #       div(
+  #         style = "display: flex; justify-content: space-around; flex-wrap: wrap;",
+  #         sliderInput(
+  #           "ord_surfaceheadwind",
+  #           "Surface Headwind (kts)",
+  #           min = ord_headwind_range[1],
+  #           max = ord_headwind_range[2],
+  #           value = ord_headwind_range,
+  #           step = 0.1,
+  #           dragRange = T,
+  #           width = "450px"
+  #         )
+  #       ),
+  #       div(
+  #         style = "display: flex; justify-content: space-around; flex-wrap: wrap;",
+  #         materialSwitch("ord_remove_stationary", "Remove Stationary Points", value = T, status = "danger"),
+  #         materialSwitch("ord_remove_invalid_RTT", "Remove flights with bad RTT", value = T, status = "danger")
+  #       ),
+  #       div(
+  #         style = "text-align: center",
+  #         actionButton("ord_filter", "Filter")
+  #       )
+  #     )
+  #     
+  #   })
+  #   
+  # })
+  # 
+  # observeEvent(input$ord_callsign, {
+  #   ord_surfaceheadwind_choices <- range(ord_queried()[Follower_Flight_Plan_ID %in% input$ord_callsign]$Follower_Threshold_Surface_Headwind, na.rm = T)
+  #   updateSliderInput(
+  #     session,
+  #     "ord_surfaceheadwind",
+  #     min = ord_surfaceheadwind_choices[1],
+  #     max = ord_surfaceheadwind_choices[2],
+  #     value = ord_surfaceheadwind_choices
+  #   )
+  # })
+  # 
+  # ord_filtered <- eventReactive(input$ord_filter, {
+  #   x <- ord_queried()[Follower_Flight_Plan_ID %in% input$ord_callsign]
+  #   invalid_RTT <- ddply(
+  #     x, "Follower_Flight_Plan_ID", summarise,
+  #     MinRTT = min(Follower_Range_To_Threshold, na.rm = T),
+  #     MaxRTT = max(Follower_Range_To_Threshold, na.rm = T),
+  #     Surface_Headwind = min(Follower_Threshold_Surface_Headwind, na.rm = T)
+  #   ) %>% 
+  #     as.data.table() %>%
+  #     .[Surface_Headwind >= input$ord_surfaceheadwind[1] & Surface_Headwind <= input$ord_surfaceheadwind[2]]
+  #   if (input$ord_remove_invalid_RTT) {
+  #     invalid_RTT <- invalid_RTT[MinRTT >= 1 | MaxRTT < 4]
+  #   }
+  #   x <- x[Follower_Flight_Plan_ID %!in% invalid_RTT$Follower_Flight_Plan_ID]
+  #   if (input$ord_remove_stationary) {
+  #     k <- 2
+  #     while (k <= nrow(x)) {
+  #       same_range <- x$Follower_Range_To_Threshold[k] == x$Follower_Range_To_Threshold[k-1]
+  #       same_x <- x$X_Position[k] == x$X_Position[k-1]
+  #       same_y <- x$Y_Position[k] == x$Y_Position[k-1]
+  #       if (same_range | (same_x & same_y)) {
+  #         x <- x[-k]
+  #       } else {
+  #         k <- k + 1
+  #       }
+  #     }
+  #   }
+  #   return(x)
+  # })
+  # 
+  # observeEvent(input$ord_filter, {
+  #   
+  #   output$tab_ord_ui_3 <- renderUI({
+  #     box(
+  #       title = "3. Calibration Settings",
+  #       width = NULL,
+  #       solidHeader = T,
+  #       DT::dataTableOutput("ord_queried_output"),
+  #       div(style = "height: 5px"),
+  #       div(
+  #         style = "display: flex; justify-content: space-around; flex-wrap: wrap;",
+  #         radioGroupButtons(
+  #           "ord_speedtype",
+  #           "Speed Type",
+  #           choices = c("Track Speed", "Mode S GSPD", "Mode S IAS", "Mode S TAS", "Derived GSPD"),
+  #           selected = "Derived GSPD"
+  #         )
+  #       ),
+  #       div(
+  #         style = "text-align: center",
+  #         actionButton("ord_run", "Run Calibration")
+  #       )
+  #     )
+  #   })
+  #   
+  # })
+  # 
+  # output$ord_queried_output <- DT::renderDataTable({
+  #   datatable(
+  #     ord_filtered(),
+  #     rownames = F,
+  #     selection = "none",
+  #     options = list(
+  #       pageLength = 5,
+  #       lengthMenu = seq(5, 100, 5),
+  #       columnDefs = list(list(className = 'dt-center', targets = "_all")),
+  #       scrollX = T
+  #     )
+  #   )
+  # })
+  # 
+  # observeEvent(input$ord_run, {
+  #   
+  #   output$tab_ord_ui_4 <- renderUI({
+  #     box(
+  #       title = "4. Calibration Output",
+  #       width = NULL,
+  #       solidHeader = T,
+  #       plotlyOutput("ord_speedprofile_plot"),
+  #       div(style = "height: 5px;"),
+  #       verbatimTextOutput("ord_nls_print")
+  #     )
+  #   })
+  #   
+  # })
+  # 
+  # ord_nls <- eventReactive(input$ord_run, {
+  #   
+  #   if (nrow(ord_filtered()) == 0) return(list(x = NA, y = NA, m = NA))
+  #   
+  #   if (input$ord_speedtype == "Derived GSPD") {
+  #     
+  #     # Calculate speed based on positional difference between timestamps
+  #     tracks_new <- ord_filtered()[,c("Track_Time", "Follower_Threshold_Surface_Headwind", "Follower_Range_To_Threshold", "X_Position", "Y_Position", "Altitude", "Track_Speed")]
+  #     tracks_new$Distance_Travelled <- NA
+  #     for (k in 2:nrow(tracks_new)) {
+  #       tracks_new$Distance_Travelled[k] <- sqrt((tracks_new$X_Position[k] - tracks_new$X_Position[k-1])^2 + (tracks_new$Y_Position[k] - tracks_new$Y_Position[k-1])^2 + ((tracks_new$Altitude[k] - tracks_new$Altitude[k-1])/6076.12)^2)
+  #       if (k == 2) {
+  #         tracks_new$Distance_Travelled[k-1] <- tracks_new$Distance_Travelled[k]
+  #       }
+  #     }
+  #     tracks_new$Point_Speed <- NA
+  #     tracks_new$Point_Speed[1] <- tracks_new$Track_Speed[1]
+  #     for (k in 2:nrow(tracks_new)) {
+  #       tracks_new$Point_Speed[k] <- tracks_new$Distance_Travelled[k]/((tracks_new$Track_Time[k]-tracks_new$Track_Time[k-1])/3600)
+  #     }
+  #     
+  #     # Filter strange speeds (20% above or below Track_Speed range)
+  #     tracks_new <- tracks_new[Point_Speed >= max(min(tracks_new$Track_Speed, na.rm=T)*0.8, 50, na.rm=T) & Point_Speed <= max(tracks_new$Track_Speed, na.rm=T)*1.2]
+  #     
+  #     # Get tracks x and y vectors
+  #     x <- tracks_new$Follower_Range_To_Threshold
+  #     y <- (tracks_new$Point_Speed+tracks_new$Follower_Threshold_Surface_Headwind)/(1+550/60000)
+  #     
+  #   } else {
+  #     
+  #     x <- ord_filtered()[["Follower_Range_To_Threshold"]]
+  #     y <- ord_filtered()[[gsub(" ", "_", input$ord_speedtype)]]
+  #     
+  #   }
+  #   
+  #   if (length(x) < length(y)) {
+  #     y <- y[1:length(x)]
+  #   } else if (length(x) > length(y)) {
+  #     x <- x[1:length(y)]
+  #   }
+  #   
+  #   # Generate NLS model
+  #   m <- tryCatch(
+  #     suppressWarnings(nls(
+  #       y ~ airspeed_model_vector_break(x, a, a1, b, n1, n2),
+  #       start = list(a = 140, a1 = 140, b = 160, n1 = 3, n2 = 4),
+  #       control = nls.control(tol = 0.001, minFactor = 1/ 16384, warnOnly = T)
+  #     )),
+  #     error = function(e) NULL
+  #   )
+  #   
+  #   # Generate Simplified NLS model if first one fails
+  #   if (is.null(m)) {
+  #     x <- x %>% .[. <= 2]
+  #     y <- y[1:length(x)]
+  #     m <- tryCatch(
+  #       suppressWarnings(nls(
+  #         y ~ airspeed_model_vector_break_simplified(x, a, a1),
+  #         start = list(a = 140, a1 = 140),
+  #         control = nls.control(tol = 0.001, minFactor = 1/ 16384, warnOnly = T)
+  #       )),
+  #       error = function(e) NULL
+  #     )
+  #   }
+  #   
+  #   # Generate Even More Simplified (TM) NLS model if previous ones fail
+  #   if (is.null(m)) {
+  #     m <- tryCatch(
+  #       suppressWarnings(nls(
+  #         y ~ a,
+  #         start = list(a = 140),
+  #         control = nls.control(tol = 0.001, minFactor = 1/ 16384, warnOnly = T)
+  #       )),
+  #       error = function(e) NULL
+  #     )
+  #   }
+  #   
+  #   return(list(x = x, y = y, m = m))
+  #   
+  # })
+  # 
+  # observeEvent(ord_nls(), {
+  #   
+  #   output$ord_speedprofile_plot <- renderPlotly({
+  #     p <- plot_ly() %>%
+  #       add_markers(
+  #         x = ord_nls()$x,
+  #         y = ord_nls()$y,
+  #         name = "Raw Data",
+  #         marker = list(color = "rgb(128,34,69)")
+  #       ) %>%
+  #       add_lines(
+  #         x = ord_nls()$x,
+  #         y = ord_nls()$m$m$fitted(),
+  #         name = "Fitted Profile",
+  #         line = list(color = "rgb(213,16,103)")
+  #       ) %>%
+  #       layout(
+  #         hovermode = "compare",
+  #         xaxis = list(title = "Follower Range to Threshold (NM)"),
+  #         yaxis = list(title = "Speed (kts)")
+  #       ) %>%
+  #       config(
+  #         displaylogo = F
+  #       )
+  #     ggplotly(p, width = session$clientData$output_ord_speedprofile_plot_width) # Width fix
+  #   })
+  #   
+  #   output$ord_nls_print <- renderPrint({
+  #     print(ord_nls())
+  #   })
+  #   
   # })
   
 }

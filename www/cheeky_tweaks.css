@@ -1,7 +1,7 @@
 /* map features */
 
 #pltmap {
-  height: calc(100vh - 80px) !important;
+  height: calc(100vh - 50px) !important;
   z-index: 1;
 }
 

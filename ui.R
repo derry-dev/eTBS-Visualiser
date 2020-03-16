@@ -145,6 +145,7 @@ body_tab_db <- tabItem(
 
 body_tab_plt <- tabItem(
   "tab_plt",
+  style = "margin: -15px;",
   box(
     style = "padding: 0",
     width = NULL,
@@ -161,22 +162,36 @@ body_tab_plt <- tabItem(
 body_tab_ord <- tabItem(
   "tab_ord",
   box(
-    title = "ORD Calibration Viewer",
+    title = "ORD Calibration",
     width = NULL,
     collapsible = T,
     collapsed = T,
-    uiOutput("tab_ord_ui_1"),
-    uiOutput("tab_ord_ui_2"),
-    uiOutput("tab_ord_ui_3"),
-    uiOutput("tab_ord_ui_4")
+    div(
+      style = "display: flex; justify-content: space-between; flex-wrap: wrap;",
+      uiOutput("ordc_stage"),
+      hr(),
+      imageOutput("ordc_flow_diagram", height = "100%", width = "auto")
+    )
   ),
   box(
-    title = "Landing Pair Viewer",
+    title = "ORD Validation",
     width = NULL,
     collapsible = T,
     collapsed = T,
-    uiOutput("tab_ord_ui_a"),
-    uiOutput("tab_ord_ui_b")
+    uiOutput("ordv_stage")
+  ),
+  box(
+    title = "Adaptation Comparison",
+    width = NULL,
+    collapsible = T,
+    collapsed = T,
+    tabBox(
+      width = NULL,
+      tabPanel(
+        "Aircraft",
+        "Test"
+      )
+    )
   )
 )
 

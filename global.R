@@ -22,8 +22,6 @@ load_packages("req.txt")
 
 source("defaults.R", local = T)
 
-lss_types <- fread(file.path("data", "ORD Configuration.csv"))
-
 # ----------------------------------------------------------------------- #
 # General Functions -------------------------------------------------------
 # ----------------------------------------------------------------------- #
@@ -40,9 +38,9 @@ connection_dialogue <- function() {
       class = "centered",
       h4("Connect to Database")
     ),
-    selectizeInput("db_driver", "Driver Name", c(db_defaults$driver, ""), options = list(create = T), width="100%"),
-    selectizeInput("db_server", "Server Name", c(db_defaults$server, ""), options = list(create = T), width="100%"),
-    selectizeInput("db_database", "Database Name", c(db_defaults$database), options = list(create = T), width="100%"),
+    selectizeInput("db_driver", "Driver Name", db_defaults$driver, options = list(create = T), width="100%"),
+    selectizeInput("db_server", "Server Name", db_defaults$server, options = list(create = T), width="100%"),
+    selectizeInput("db_database", "Database Name", db_defaults$database, options = list(create = T), width="100%"),
     textInput("db_username", "Username", db_defaults$username, width="100%"),
     passwordInput("db_password", "Password", db_defaults$password, width="100%"),
     div(
@@ -65,7 +63,7 @@ get_db_connection <- function(str_driver, str_server, str_database, str_uid, str
 }
 
 # ----------------------------------------------------------------------- #
-# Debug dialogue ----------------------------------------------------------
+# Debug Dialogue ----------------------------------------------------------
 # ----------------------------------------------------------------------- #
 
 debug_dialogue <- function() {
@@ -82,24 +80,7 @@ debug_dialogue <- function() {
 }
 
 # ----------------------------------------------------------------------- #
-# Debug dialogue ----------------------------------------------------------
-# ----------------------------------------------------------------------- #
-
-db_stats_dialogue <- function() {
-  modalDialog(
-    div(
-      class = "centered",
-      h4("Database Statistics")
-    ),
-    DT::dataTableOutput("db_stats_table"),
-    size = "m",
-    footer = NULL,
-    easyClose = T
-  )
-}
-
-# ----------------------------------------------------------------------- #
-# ORD Calibration Functions -----------------------------------------------
+# ORD Functions -----------------------------------------------------------
 # ----------------------------------------------------------------------- #
 
 calc_landing_adjustment <- function(landing_type, headwind) {
@@ -154,4 +135,87 @@ airspeed_model_break_simplified <- function(x, a, a1) {
 
 airspeed_model_vector_break_simplified <- function(x, a, a1) {
   sapply(x, airspeed_model_break_simplified, a = a, a1 = a1, simplify = T)
+}
+
+parameter_summary <- function(dat, sum_var, sum_param) {
+  dat[[sum_param]] <- as.numeric(dat[[sum_param]])
+  x <- ddply(
+    dat, sum_var, summarise,
+    N = length(eval(parse(text=sum_param))),
+    mean = mean(eval(parse(text=sum_param)), na.rm = T),
+    median = median(eval(parse(text=sum_param)), na.rm = T),
+    sd = sd(eval(parse(text=sum_param)), na.rm = T),
+    p5 = quantile(eval(parse(text=sum_param)), 0.05, na.rm = T),
+    p10 = quantile(eval(parse(text=sum_param)), 0.1, na.rm = T)
+  )
+  x$Type <- sum_param
+  return(x)
+}
+
+dodgy_colour_function <- function(aircraft_type) {
+  x_char <- unlist(strsplit(as.character(aircraft_type), split="")) %>% ifelse(grepl("^[A-Z]$", .), match(., LETTERS), .) %>% as.numeric()
+  x_tabl <- x_char %>% data.table(
+    V1 = .[c(T, F, F, F)],
+    V2 = .[c(F, T, F, F)],
+    V3 = .[c(F, F, T, F)],
+    V4 = .[c(F, F, F, T)],
+    keep.rownames = F
+  )
+  x_prod <- paste0(x_tabl$V1, x_tabl$V2, x_tabl$V3, x_tabl$V4) %>% as.numeric()
+  x_conv <- floor((x_prod - mean(x_prod)) / sd(x_prod) * 256^3 - 1)
+  x_chex <- paste0("#", as.hexmode(x_conv))
+  return(x_chex)
+}
+
+# Find area under density curve using trapezoidal rule
+density_area <- function(den, min, max, min_include = T, max_include = T) {
+  den_x_range <- if (min_include & max_include) {
+    den$x[den$x >= min & den$x <= max]
+  } else if (min_include & !max_include) {
+    den$x[den$x >= min & den$x < max]
+  } else if (!min_include & max_include) {
+    den$x[den$x > min & den$x <= max]
+  } else if (!min_include & !max_include) {
+    den$x[den$x > min & den$x < max]
+  }
+  den_y_range <- den$y[which(den$x %in% den_x_range)]
+  if (length(den_y_range) > 1) {
+    trapezoidal_areas <- sapply(2:length(den_y_range), function(i) (den_x_range[i] - den_x_range[i-1]) * (den_y_range[i] + den_y_range[i-1]) / 2)
+    total_area <- sum(trapezoidal_areas)
+    return(total_area)
+  } else {
+    return(0)
+  }
+}
+
+# ----------------------------------------------------------------------- #
+# xlsx Functions ----------------------------------------------------------
+# ----------------------------------------------------------------------- #
+
+createBook <- function() {
+  createWorkbook(type="xlsx")
+}
+
+writeCell <- function(worksheet, row_index, col_index, value) {
+  r <- createCell(createRow(worksheet, rowIndex = row_index), colIndex = col_index)
+  setCellValue(r[[1,1]], value)
+}
+
+writeRow <- function(worksheet, row_index, col_indices, values) {
+  r <- createCell(createRow(worksheet, rowIndex = row_index), colIndex = 1:max(col_indices))
+  for (i in 1:length(col_indices)) {
+    setCellValue(r[[1,col_indices[i]]], values[i])
+  }
+}
+
+writeTable <- function(worksheet, row_index, col_index, data_table) {
+  addDataFrame(data_table, worksheet, startRow = row_index, startColumn = col_index, row.names = F)
+}
+
+writeImage <- function(worksheet, row_index, col_index, img) {
+  addPicture(img, worksheet, scale = 1, startRow = row_index, startColumn = col_index)
+}
+
+saveBook <- function(workbook, filename) {
+  saveWorkbook(workbook, filename)
 }
