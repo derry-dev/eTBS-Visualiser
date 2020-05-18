@@ -10,6 +10,7 @@ load_packages <- function(path) {
     missing_packages <- req[!(req %in% installed.packages()[,"Package"])]
     if (length(missing_packages) > 0) {
       install.packages(missing_packages, repos = "https://cloud.r-project.org", dependencies = T)
+      Sys.sleep(10)
       if ("mapview" %in% missing_packages) {
         webshot::install_phantomjs()
       }

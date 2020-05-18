@@ -102,6 +102,13 @@ body_tab_db <- tabItem(
     )
   ),
   box(
+    title = "Lookup Flight Statistics",
+    width = NULL,
+    collapsible = T,
+    collapsed = T,
+    NA
+  ),
+  box(
     title = "Flight Plan Statistics",
     width = NULL,
     collapsible = T,

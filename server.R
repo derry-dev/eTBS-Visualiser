@@ -446,16 +446,19 @@ function(input, output, session) {
     div(
       class = "pltmap-filters",
       dropdown(
+        div(style = "font-weight: bold; padding-bottom: 10px", "Display Tracks"),
         pickerInput("pltmap_fpdate", "Select Date", NULL, multiple=T, options = list(`actions-box` = T, `live-search` = T), width="220px"),
         pickerInput("pltmap_fpid", "Select FP ID", NULL, multiple=T, options = list(`actions-box` = T, `live-search` = T), width="220px"),
-        pickerInput("pltmap_legs", "Filter By Leg", NULL, multiple=T, options = list(`actions-box` = T, `live-search` = T), width="220px"),
+        pickerInput("pltmap_legs", "Filter By Path Leg", NULL, multiple=T, options = list(`actions-box` = T, `live-search` = T), width="220px"),
         div(
           style = "display: flex; justify-content: space-between;",
           actionButton("pltmap_clear_tracks", "Clear tracks"),
           actionButton("pltmap_plot_tracks", "Plot tracks")
         ),
+        hr(),
+        pickerInput("pltmap_volumes", "Display Volumes", NULL, multiple=T, options = list(`actions-box` = T, `live-search` = T), width="220px"),
         style = "minimal", icon = icon("plane"),
-        tooltip = tooltipOptions(title = "Track Plotting", placement = "right")
+        tooltip = tooltipOptions(title = "Display Options", placement = "right")
       ),
       div(style = "height: 5px"),
       dropdown(
@@ -475,14 +478,13 @@ function(input, output, session) {
         div(style = "height: 5px;"),
         div(
           style = "display: flex; flex-direction: row; flex-wrap: wrap; justify-content: space-around; height: 320px; width: 460px",
-          pickerInput("pltmap_volumes", "Display Volumes", NULL, multiple=T, options = list(`actions-box` = T, `live-search` = T), width="220px"),
-          sliderTextInput("pltmap_volume_dash", "Dash Size", choices=seq(1, 50, 1), selected=5, width="220px"),
           sliderTextInput("pltmap_volume_weight", "Weight", choices=seq(1, 50, 1), selected=5, width="220px"),
           sliderTextInput("pltmap_volume_highlightweight", "Highlight Weight", choices=seq(1, 50, 1), selected=3, width="220px"),
           sliderTextInput("pltmap_volume_opacity", "Opacity", choices=seq(0, 1, 0.01), selected=0.5, width="220px"),
           sliderTextInput("pltmap_volume_highlightopacity", "Highlight Opacity", choices=seq(0, 1, 0.01), selected=0.5, width="220px"),
           sliderTextInput("pltmap_volume_fillopacity", "Fill Opacity", choices=seq(0, 1, 0.01), selected=0.1, width="220px"),
-          sliderTextInput("pltmap_volume_highlightfillopacity", "Highlight Fill Opacity", choices=seq(0, 1, 0.01), selected=0.5, width="220px")
+          sliderTextInput("pltmap_volume_highlightfillopacity", "Highlight Fill Opacity", choices=seq(0, 1, 0.01), selected=0.5, width="220px"),
+          sliderTextInput("pltmap_volume_dash", "Dash Size", choices=seq(1, 50, 1), selected=5, width="220px")
         ),
         div(
           style = "display: inline-flex; flex-direction: column; flex-wrap: wrap; justify-content: space-between; height: 80px; width: 460px",
@@ -517,7 +519,7 @@ function(input, output, session) {
           DT::dataTableOutput("plt_tracks")
         ),
         style = "minimal", icon = icon("route"),
-        tooltip = tooltipOptions(title = "Plotted Tracks", placement = "right")
+        tooltip = tooltipOptions(title = "Plotted Tracks Table", placement = "right")
       ),
       div(style = "height: 5px"),
       actionBttn("pltmap_toggle_timefilter", NULL, style = "minimal", icon = icon("clock")),
@@ -553,8 +555,8 @@ function(input, output, session) {
         subtext = pltmap_fpid_choices$Callsign %>% as.character(),
         style = ifelse(
           pltmap_fpid_choices$Flight_Plan_ID %>% as.character() %in% track_fpid_check, 
-          "background-color: green; color: white;",
-          "background-color: red; color: white"
+          "border-left: 5px solid green;",
+          "border-left: 5px solid red;"
         )
       )
     )
@@ -730,21 +732,21 @@ function(input, output, session) {
       
       p <- leaflet(options = leafletOptions(zoomControl = F, preferCanvas = T))
       
-      if (input$pltmap_groups == "Satellite") {
-        p <- p %>% addProviderTiles(providers$Esri.WorldImagery, options=providerTileOptions(noWrap=TRUE))
-      } else if (input$pltmap_groups == "Grey") {
-        p <- p %>% addProviderTiles(providers$CartoDB.Positron, options=providerTileOptions(noWrap=TRUE))
-      } else if (input$pltmap_groups == "Dark") {
-        p <- p %>% addProviderTiles(providers$CartoDB.DarkMatter, options=providerTileOptions(noWrap=TRUE))
-      } else if (input$pltmap_groups == "Light") {
-        p <- p %>% addProviderTiles(providers$Esri.WorldTopoMap, options=providerTileOptions(noWrap=TRUE))
-      } else if (input$pltmap_groups == "Topo") {
-        p <- p %>% addProviderTiles(providers$Esri.DeLorme, options=providerTileOptions(noWrap=TRUE))
-      } else if (input$pltmap_groups == "OSM") {
-        p <- p %>% addProviderTiles(providers$OpenStreetMap.Mapnik, options=providerTileOptions(noWrap=TRUE))
-      } else if (input$pltmap_groups == "OSM B&W") {
-        p <- p %>% addProviderTiles(providers$OpenStreetMap.BlackAndWhite, options=providerTileOptions(noWrap=TRUE))
-      }
+      # if (input$pltmap_groups == "Esri Satellite") {
+      #   p <- p %>% addProviderTiles(providers$Esri.WorldImagery, options=providerTileOptions(noWrap=TRUE))
+      # } else if (input$pltmap_groups == "CartoDB Light") {
+      #   p <- p %>% addProviderTiles(providers$CartoDB.Positron, options=providerTileOptions(noWrap=TRUE))
+      # } else if (input$pltmap_groups == "CartoDB Light 2") {
+      #   p <- p %>% addProviderTiles(providers$CartoDB.PositronNoLabels, options=providerTileOptions(noWrap=TRUE))
+      # } else if (input$pltmap_groups == "CartoDB Dark") {
+      #   p <- p %>% addProviderTiles(providers$CartoDB.DarkMatter, options=providerTileOptions(noWrap=TRUE))
+      # } else if (input$pltmap_groups == "CartoDB Dark 2") {
+      #   p <- p %>% addProviderTiles(providers$CartoDB.DarkMatterNoLabels, options=providerTileOptions(noWrap=TRUE))
+      # } else if (input$pltmap_groups == "OSM Mapnik") {
+      #   p <- p %>% addProviderTiles(providers$OpenStreetMap.Mapnik, options=providerTileOptions(noWrap=TRUE))
+      # }
+      
+      p <- p %>% addProviderTiles(providers$Esri.WorldImagery, options=providerTileOptions(noWrap=TRUE))
       
       p <- p %>% setView(lng = input$pltmap_center$lng, lat = input$pltmap_center$lat, zoom = input$pltmap_zoom)
       
@@ -764,6 +766,16 @@ function(input, output, session) {
             fillOpacity=input$pltmap_marker_fillopacity,
             group="Tracks"
           )
+        # p <- p %>%
+        #   clearGroup("Legend") %>%
+        #   addLegend(
+        #     position = "bottomleft",
+        #     title = input$pltmap_colour,
+        #     pal = pal,
+        #     values = ~eval(parse(text=input$pltmap_colour)),
+        #     opacity = 0.85,
+        #     layerId = "Legend"
+        #   )
       }
       
       if (!is.null(update_pltmap$volumes)) {
@@ -863,10 +875,9 @@ function(input, output, session) {
     " %>% sqlQuery(con(),.) %>% unlist() %>% as.vector()
   })
   
-  # ordc_stage
-  
-  # ORD Calibration Stages
-  ordc_currentstage <- reactiveVal("start")
+  output$ordc_stage <- renderUI({
+    
+  })
   
   
   # # ----------------------------------------------------------------------- #
